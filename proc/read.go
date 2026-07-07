@@ -28,9 +28,13 @@ type (
 
 	// Static contains data read from /proc/pid/*
 	Static struct {
-		Name         string
-		Cmdline      []string
-		Cgroups      []string
+		Name    string
+		Cmdline []string
+		Cgroups []string
+		// CgroupV2Path is the path of the unified (v2) cgroup hierarchy for
+		// this process, i.e. the path from the "0::/path" line of
+		// /proc/<pid>/cgroup (HierarchyID == 0). Empty on pure cgroupv1 hosts.
+		CgroupV2Path string
 		ParentPid    int
 		StartTime    time.Time
 		EffectiveUID int
@@ -386,11 +390,17 @@ func (p *proccache) GetStatic() (Static, error) {
 	// case.
 	cgroups, err := p.getCgroups()
 	var cgroupsStr []string
+	var cgroupV2Path string
 	if err != nil {
 		cgroupsStr = []string{}
 	} else {
 		for _, c := range cgroups {
 			cgroupsStr = append(cgroupsStr, c.Path)
+			// The unified cgroupv2 hierarchy is the "0::/path" line, i.e.
+			// HierarchyID == 0. On a pure v2 host it is the only line.
+			if c.HierarchyID == 0 {
+				cgroupV2Path = c.Path
+			}
 		}
 	}
 
@@ -398,6 +408,7 @@ func (p *proccache) GetStatic() (Static, error) {
 		Name:         stat.Comm,
 		Cmdline:      cmdline,
 		Cgroups:      cgroupsStr,
+		CgroupV2Path: cgroupV2Path,
 		ParentPid:    stat.PPID,
 		StartTime:    startTime,
 		EffectiveUID: int(status.UIDs[1]),

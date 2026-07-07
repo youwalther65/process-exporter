@@ -76,6 +76,9 @@ type (
 	Update struct {
 		// GroupName is the name given by the namer to the process.
 		GroupName string
+		// CgroupV2Path is the process's unified cgroupv2 path (from the
+		// "0::/path" line of /proc/<pid>/cgroup), or "" if unavailable.
+		CgroupV2Path string
 		// Latest is how much the counts increased since last cycle.
 		Latest Delta
 		// Memory is the current memory usage.
@@ -117,14 +120,15 @@ func lessCounts(x, y Counts) bool { return seq.Compare(x, y) < 0 }
 
 func (tp *trackedProc) getUpdate() Update {
 	u := Update{
-		GroupName:  tp.groupName,
-		Latest:     tp.lastaccum,
-		Memory:     tp.metrics.Memory,
-		Filedesc:   tp.metrics.Filedesc,
-		Start:      tp.static.StartTime,
-		NumThreads: tp.metrics.NumThreads,
-		States:     tp.metrics.States,
-		Wchans:     make(map[string]int),
+		GroupName:    tp.groupName,
+		CgroupV2Path: tp.static.CgroupV2Path,
+		Latest:       tp.lastaccum,
+		Memory:       tp.metrics.Memory,
+		Filedesc:     tp.metrics.Filedesc,
+		Start:        tp.static.StartTime,
+		NumThreads:   tp.metrics.NumThreads,
+		States:       tp.metrics.States,
+		Wchans:       make(map[string]int),
 	}
 	if tp.metrics.Wchan != "" {
 		u.Wchans[tp.metrics.Wchan] = 1

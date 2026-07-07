@@ -50,6 +50,41 @@ process_names:
 	c.Check(name, Equals, "ksh")
 }
 
+func (s MySuite) TestConfigCgroups(c *C) {
+	yml := `
+process_names:
+  - comm:
+    - nma
+cgroups:
+  psi:
+    windows:
+    - total
+    - avg10
+  memory:
+    stat_fields:
+    - anon
+    - file
+    - slab
+`
+	cfg, err := GetConfig(yml, false)
+	c.Assert(err, IsNil)
+	c.Check(cfg.Cgroups.PSIWindows, DeepEquals, []string{"total", "avg10"})
+	c.Check(cfg.Cgroups.MemoryStatFields, DeepEquals, []string{"anon", "file", "slab"})
+}
+
+func (s MySuite) TestConfigCgroupsAbsent(c *C) {
+	// A config with no cgroups block yields a zero CgroupConfig (backward compatible).
+	yml := `
+process_names:
+  - comm:
+    - nma
+`
+	cfg, err := GetConfig(yml, false)
+	c.Assert(err, IsNil)
+	c.Check(cfg.Cgroups.PSIWindows, IsNil)
+	c.Check(cfg.Cgroups.MemoryStatFields, IsNil)
+}
+
 func (s MySuite) TestConfigTemplates(c *C) {
 	yml := `
 process_names:

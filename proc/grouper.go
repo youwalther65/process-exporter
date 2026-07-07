@@ -42,6 +42,13 @@ type (
 		WorstFDratio    float64
 		NumThreads      uint64
 		Threads         []Threads
+		// CgroupV2Path is the unified cgroupv2 path shared by all procs in this
+		// group, or "" if none reported one. CgroupV2Conflict is set when procs
+		// in the group report differing cgroup paths, in which case cgroup
+		// metrics must not be emitted for the group (they would conflate
+		// unrelated cgroups) — see the skip-and-count policy.
+		CgroupV2Path     string
+		CgroupV2Conflict bool
 	}
 )
 
@@ -89,6 +96,17 @@ func groupadd(grp Group, ts Update) Group {
 	}
 	for wchan, count := range ts.Wchans {
 		grp.Wchans[wchan] += count
+	}
+
+	// Track the group's cgroupv2 path, flagging a conflict if procs disagree.
+	// Empty paths (procs with no v2 cgroup) neither set nor conflict. Once a
+	// conflict is seen it sticks for the cycle, so cgroup metrics are skipped.
+	if !grp.CgroupV2Conflict && ts.CgroupV2Path != "" {
+		if grp.CgroupV2Path == "" {
+			grp.CgroupV2Path = ts.CgroupV2Path
+		} else if grp.CgroupV2Path != ts.CgroupV2Path {
+			grp.CgroupV2Conflict = true
+		}
 	}
 
 	return grp

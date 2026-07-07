@@ -176,14 +176,40 @@ func (m andMatcher) Match(nacl common.ProcAttributes) bool {
 	return true
 }
 
+// CgroupConfig holds the optional cgroupv2 metric configuration parsed from the
+// top-level `cgroups:` block. Metric *families* are enabled via CLI flags; this
+// struct only carries the field-level allowlists and PSI window selection that
+// bound cardinality. An absent block yields a zero value, which combined with no
+// CLI flags means no cgroup metrics are emitted (backward compatible).
+type CgroupConfig struct {
+	// PSIWindows lists which PSI values to emit. Valid entries: "total"
+	// (default), "avg10", "avg60", "avg300". Empty means total only.
+	PSIWindows []string
+	// MemoryStatFields lists which memory.stat fields to emit. Empty means the
+	// collector's curated default subset (never all fields).
+	MemoryStatFields []string
+}
+
 type Config struct {
 	MatchNamers FirstMatcher
+	Cgroups     CgroupConfig
 }
 
 func (c *Config) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 	type (
+		psiRules struct {
+			Windows []string `yaml:"windows"`
+		}
+		memoryRules struct {
+			StatFields []string `yaml:"stat_fields"`
+		}
+		cgroupRules struct {
+			PSI    psiRules    `yaml:"psi"`
+			Memory memoryRules `yaml:"memory"`
+		}
 		root struct {
 			Matchers MatcherRules `yaml:"process_names"`
+			Cgroups  cgroupRules  `yaml:"cgroups"`
 		}
 	)
 
@@ -195,6 +221,10 @@ func (c *Config) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 	cfg, err := r.Matchers.ToConfig()
 	if err != nil {
 		return err
+	}
+	cfg.Cgroups = CgroupConfig{
+		PSIWindows:       r.Cgroups.PSI.Windows,
+		MemoryStatFields: r.Cgroups.Memory.StatFields,
 	}
 	*c = *cfg
 	return nil
