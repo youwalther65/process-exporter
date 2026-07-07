@@ -64,6 +64,26 @@ func (r *Reader) ReadPSI(cgroupPath, resource string) (PSIStats, error) {
 	return ParsePSI(content)
 }
 
+// ReadUint64 reads and parses a single-value file (e.g. memory.current,
+// pids.current) under the given cgroup path.
+func (r *Reader) ReadUint64(cgroupPath, name string) (uint64, error) {
+	content, err := r.readFile(cgroupPath, name)
+	if err != nil {
+		return 0, err
+	}
+	return ParseUint64(content)
+}
+
+// ReadKeyed reads and parses a "key value" file (e.g. memory.stat, cpu.stat)
+// under the given cgroup path.
+func (r *Reader) ReadKeyed(cgroupPath, name string) (map[string]uint64, error) {
+	content, err := r.readFile(cgroupPath, name)
+	if err != nil {
+		return nil, err
+	}
+	return ParseKeyed(content)
+}
+
 // exists reports whether name exists under cgroupPath. Used to detect kernels
 // or cgroups where PSI is not enabled (the *.pressure files are absent).
 func (r *Reader) exists(cgroupPath, name string) bool {

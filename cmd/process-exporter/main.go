@@ -188,6 +188,12 @@ func main() {
 			"path to the unified cgroupv2 mount, used by the -cgroup.* metrics")
 		cgroupPSI = flag.Bool("cgroup.psi", false,
 			"export cgroupv2 pressure-stall (PSI) metrics per group (requires cgroupv2 with PSI enabled)")
+		cgroupMemory = flag.Bool("cgroup.memory", false,
+			"export cgroupv2 memory.current and allowlisted memory.stat fields per group")
+		cgroupCPU = flag.Bool("cgroup.cpu", false,
+			"export cgroupv2 cpu.stat (user/system seconds) per group")
+		cgroupPids = flag.Bool("cgroup.pids", false,
+			"export cgroupv2 pids.current per group")
 	)
 	flag.Parse()
 
@@ -261,10 +267,13 @@ func main() {
 	// Enable cgroupv2 collection only if at least one -cgroup.* family is set.
 	// When nil, the exporter behaves exactly as it did before.
 	var cgroupOption *collector.CgroupCollectorOption
-	if *cgroupPSI {
+	if *cgroupPSI || *cgroupMemory || *cgroupCPU || *cgroupPids {
 		cgroupOption = &collector.CgroupCollectorOption{
 			CgroupFSPath: *cgroupfsPath,
 			PSI:          *cgroupPSI,
+			Memory:       *cgroupMemory,
+			CPU:          *cgroupCPU,
+			Pids:         *cgroupPids,
 			Config:       cgroupConfig,
 			Debug:        *debug,
 		}

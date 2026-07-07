@@ -148,3 +148,106 @@ func TestNewCgroupCollectorDisabled(t *testing.T) {
 		t.Error("expected nil collector when no family enabled")
 	}
 }
+
+// writeStatFixture writes memory.current, memory.stat, cpu.stat and
+// pids.current for one unit and returns the cgroupfs root.
+func writeStatFixture(t *testing.T, cgroupPath string) string {
+	t.Helper()
+	root := t.TempDir()
+	unit := filepath.Join(root, strings.Trim(cgroupPath, "/"))
+	if err := os.MkdirAll(unit, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"memory.current": "104857600\n",
+		"memory.stat":    "anon 1048576\nfile 2097152\nkernel 524288\nslab 262144\nsock 131072\nunused_field 999\n",
+		"cpu.stat":       "usage_usec 9000000\nuser_usec 6000000\nsystem_usec 3000000\nnr_periods 0\n",
+		"pids.current":   "17\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(unit, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+func TestCgroupCollectorMemory(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, Memory: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	// memory.current plus the curated default stat fields (anon/file/kernel/slab/sock).
+	// unused_field is present in the file but not allowlisted, so must not appear.
+	const want = `
+# HELP namedprocess_namegroup_cgroup_memory_current_bytes Total memory currently in use by this group's cgroup (memory.current).
+# TYPE namedprocess_namegroup_cgroup_memory_current_bytes gauge
+namedprocess_namegroup_cgroup_memory_current_bytes{groupname="nma"} 1.048576e+08
+# HELP namedprocess_namegroup_cgroup_memory_stat_bytes Selected memory.stat fields for this group's cgroup.
+# TYPE namedprocess_namegroup_cgroup_memory_stat_bytes gauge
+namedprocess_namegroup_cgroup_memory_stat_bytes{field="anon",groupname="nma"} 1.048576e+06
+namedprocess_namegroup_cgroup_memory_stat_bytes{field="file",groupname="nma"} 2.097152e+06
+namedprocess_namegroup_cgroup_memory_stat_bytes{field="kernel",groupname="nma"} 524288
+namedprocess_namegroup_cgroup_memory_stat_bytes{field="slab",groupname="nma"} 262144
+namedprocess_namegroup_cgroup_memory_stat_bytes{field="sock",groupname="nma"} 131072
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_memory_current_bytes",
+		"namedprocess_namegroup_cgroup_memory_stat_bytes",
+	); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCgroupCollectorCPUAndPids(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, CPU: true, Pids: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	// user_usec 6000000 -> 6s, system_usec 3000000 -> 3s; pids.current 17.
+	const want = `
+# HELP namedprocess_namegroup_cgroup_cpu_seconds_total CPU time consumed by this group's cgroup (cpu.stat), by mode.
+# TYPE namedprocess_namegroup_cgroup_cpu_seconds_total counter
+namedprocess_namegroup_cgroup_cpu_seconds_total{groupname="nma",mode="system"} 3
+namedprocess_namegroup_cgroup_cpu_seconds_total{groupname="nma",mode="user"} 6
+# HELP namedprocess_namegroup_cgroup_pids_current Number of processes/threads currently in this group's cgroup (pids.current).
+# TYPE namedprocess_namegroup_cgroup_pids_current gauge
+namedprocess_namegroup_cgroup_pids_current{groupname="nma"} 17
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_cpu_seconds_total",
+		"namedprocess_namegroup_cgroup_pids_current",
+	); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCgroupCollectorMemoryStatAllowlist(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	// Config names only "anon" -> only that field emitted.
+	cc, err := newCgroupCollector(CgroupCollectorOption{
+		CgroupFSPath: root, Memory: true,
+		Config: config.CgroupConfig{MemoryStatFields: []string{"anon"}},
+	})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_memory_stat_bytes")
+	if n != 1 {
+		t.Errorf("expected exactly 1 memory.stat series (anon only), got %d", n)
+	}
+}

@@ -21,10 +21,21 @@ type CgroupCollectorOption struct {
 	CgroupFSPath string
 	// PSI enables the pressure-stall metrics.
 	PSI bool
+	// Memory enables memory.current and memory.stat (allowlisted fields).
+	Memory bool
+	// CPU enables cpu.stat (user/system seconds).
+	CPU bool
+	// Pids enables pids.current.
+	Pids bool
 	// Config carries the field allowlists / PSI window selection.
 	Config config.CgroupConfig
 	Debug  bool
 }
+
+// defaultMemoryStatFields is the curated subset of memory.stat emitted when the
+// config names no explicit fields. Kept small deliberately: memory.stat has
+// ~40 fields and emitting all of them is the biggest cardinality trap.
+var defaultMemoryStatFields = []string{"anon", "file", "kernel", "slab", "sock"}
 
 // PSI metric descriptors. Following node_exporter's vocabulary, the resource
 // (cpu/memory/io) and the some/full distinction ("waiting"/"stalled") are
@@ -66,16 +77,40 @@ var (
 		"namedprocess_scrape_cgroup_skipped",
 		"incremented each time a group's cgroup metrics are skipped because its procs span multiple cgroups",
 		nil, nil)
+
+	memoryCurrentDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_memory_current_bytes",
+		"Total memory currently in use by this group's cgroup (memory.current).",
+		[]string{"groupname"}, nil)
+
+	memoryStatDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_memory_stat_bytes",
+		"Selected memory.stat fields for this group's cgroup.",
+		[]string{"groupname", "field"}, nil)
+
+	cgroupCPUDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_cpu_seconds_total",
+		"CPU time consumed by this group's cgroup (cpu.stat), by mode.",
+		[]string{"groupname", "mode"}, nil)
+
+	pidsCurrentDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pids_current",
+		"Number of processes/threads currently in this group's cgroup (pids.current).",
+		[]string{"groupname"}, nil)
 )
 
 // cgroupCollector reads cgroupv2 metrics for groups with a resolved single
 // cgroup path and emits them. It is created only when at least one family is
 // enabled; when nil, the exporter behaves exactly as upstream.
 type cgroupCollector struct {
-	reader       *cgroup.Reader
-	psi          bool
-	emitAverages bool
-	debug        bool
+	reader        *cgroup.Reader
+	psi           bool
+	memory        bool
+	cpu           bool
+	pids          bool
+	emitAverages  bool
+	memStatFields []string
+	debug         bool
 
 	// skipped counts groups whose cgroup metrics were skipped this process
 	// lifetime because their procs spanned multiple cgroups (skip-and-count).
@@ -85,18 +120,26 @@ type cgroupCollector struct {
 // newCgroupCollector opens the cgroupfs root and returns a collector for the
 // enabled families. Returns nil (no error) if no family is enabled.
 func newCgroupCollector(opt CgroupCollectorOption) (*cgroupCollector, error) {
-	if !opt.PSI {
+	if !opt.PSI && !opt.Memory && !opt.CPU && !opt.Pids {
 		return nil, nil
 	}
 	reader, err := cgroup.NewReader(opt.CgroupFSPath)
 	if err != nil {
 		return nil, err
 	}
+	memStatFields := opt.Config.MemoryStatFields
+	if len(memStatFields) == 0 {
+		memStatFields = defaultMemoryStatFields
+	}
 	return &cgroupCollector{
-		reader:       reader,
-		psi:          opt.PSI,
-		emitAverages: psiWindowsIncludeAverages(opt.Config.PSIWindows),
-		debug:        opt.Debug,
+		reader:        reader,
+		psi:           opt.PSI,
+		memory:        opt.Memory,
+		cpu:           opt.CPU,
+		pids:          opt.Pids,
+		emitAverages:  psiWindowsIncludeAverages(opt.Config.PSIWindows),
+		memStatFields: memStatFields,
+		debug:         opt.Debug,
 	}, nil
 }
 
@@ -120,6 +163,10 @@ func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 	ch <- psiIOStalledDesc
 	ch <- psiRatioDesc
 	ch <- cgroupSkippedDesc
+	ch <- memoryCurrentDesc
+	ch <- memoryStatDesc
+	ch <- cgroupCPUDesc
+	ch <- pidsCurrentDesc
 }
 
 // collectGroup emits cgroup metrics for a single named group. Per the
@@ -140,6 +187,68 @@ func (c *cgroupCollector) collectGroup(ch chan<- prometheus.Metric, gname string
 
 	if c.psi {
 		c.collectPSI(ch, gname, group.CgroupV2Path)
+	}
+	if c.memory {
+		c.collectMemory(ch, gname, group.CgroupV2Path)
+	}
+	if c.cpu {
+		c.collectCPU(ch, gname, group.CgroupV2Path)
+	}
+	if c.pids {
+		c.collectPids(ch, gname, group.CgroupV2Path)
+	}
+}
+
+// collectMemory emits memory.current and the allowlisted memory.stat fields.
+func (c *cgroupCollector) collectMemory(ch chan<- prometheus.Metric, gname, cgroupPath string) {
+	if cur, err := c.reader.ReadUint64(cgroupPath, "memory.current"); err != nil {
+		c.debugf("group %q: reading memory.current: %v", gname, err)
+	} else {
+		ch <- prometheus.MustNewConstMetric(memoryCurrentDesc, prometheus.GaugeValue, float64(cur), gname)
+	}
+
+	stat, err := c.reader.ReadKeyed(cgroupPath, "memory.stat")
+	if err != nil {
+		c.debugf("group %q: reading memory.stat: %v", gname, err)
+		return
+	}
+	for _, field := range c.memStatFields {
+		// Only emit fields actually present, so a mistyped/absent field silently
+		// produces no series rather than a zero.
+		if v, ok := stat[field]; ok {
+			ch <- prometheus.MustNewConstMetric(memoryStatDesc, prometheus.GaugeValue, float64(v), gname, field)
+		}
+	}
+}
+
+// collectCPU emits user/system CPU seconds from cpu.stat (reported in µs).
+func (c *cgroupCollector) collectCPU(ch chan<- prometheus.Metric, gname, cgroupPath string) {
+	stat, err := c.reader.ReadKeyed(cgroupPath, "cpu.stat")
+	if err != nil {
+		c.debugf("group %q: reading cpu.stat: %v", gname, err)
+		return
+	}
+	if v, ok := stat["user_usec"]; ok {
+		ch <- prometheus.MustNewConstMetric(cgroupCPUDesc, prometheus.CounterValue, float64(v)/microsecondsPerSecond, gname, "user")
+	}
+	if v, ok := stat["system_usec"]; ok {
+		ch <- prometheus.MustNewConstMetric(cgroupCPUDesc, prometheus.CounterValue, float64(v)/microsecondsPerSecond, gname, "system")
+	}
+}
+
+// collectPids emits pids.current.
+func (c *cgroupCollector) collectPids(ch chan<- prometheus.Metric, gname, cgroupPath string) {
+	cur, err := c.reader.ReadUint64(cgroupPath, "pids.current")
+	if err != nil {
+		c.debugf("group %q: reading pids.current: %v", gname, err)
+		return
+	}
+	ch <- prometheus.MustNewConstMetric(pidsCurrentDesc, prometheus.GaugeValue, float64(cur), gname)
+}
+
+func (c *cgroupCollector) debugf(format string, args ...interface{}) {
+	if c.debug {
+		log.Printf(format, args...)
 	}
 }
 
