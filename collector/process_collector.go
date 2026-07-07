@@ -165,6 +165,9 @@ type (
 		RecheckTimeLimit  time.Duration
 		Debug             bool
 		RemoveEmptyGroups bool
+		// Cgroup, when non-nil, enables cgroupv2 metric collection. A nil value
+		// preserves the exporter's original behavior exactly.
+		Cgroup *CgroupCollectorOption
 	}
 
 	NamedProcessCollector struct {
@@ -177,6 +180,7 @@ type (
 		scrapeProcReadErrors int
 		scrapePartialErrors  int
 		debug                bool
+		cgroup               *cgroupCollector
 	}
 )
 
@@ -194,6 +198,14 @@ func NewProcessCollector(options ProcessCollectorOption) (*NamedProcessCollector
 		threads:    options.Threads,
 		smaps:      options.GatherSMaps,
 		debug:      options.Debug,
+	}
+
+	if options.Cgroup != nil {
+		cc, err := newCgroupCollector(*options.Cgroup)
+		if err != nil {
+			return nil, err
+		}
+		p.cgroup = cc
 	}
 
 	colErrs, _, err := p.Update(p.source.AllProcs())
@@ -236,6 +248,9 @@ func (p *NamedProcessCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- threadMajorPageFaultsDesc
 	ch <- threadMinorPageFaultsDesc
 	ch <- threadContextSwitchesDesc
+	if p.cgroup != nil {
+		p.cgroup.describe(ch)
+	}
 }
 
 // Collect implements prometheus.Collector.
@@ -309,6 +324,10 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 					prometheus.GaugeValue, float64(count), gname, wchan)
 			}
 
+			if p.cgroup != nil {
+				p.cgroup.collectGroup(ch, gname, gcounts)
+			}
+
 			if p.smaps {
 				ch <- prometheus.MustNewConstMetric(membytesDesc,
 					prometheus.GaugeValue, float64(gcounts.Memory.ProportionalBytes), gname, "proportionalResident")
@@ -355,4 +374,7 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 		prometheus.CounterValue, float64(p.scrapeProcReadErrors))
 	ch <- prometheus.MustNewConstMetric(scrapePartialErrorsDesc,
 		prometheus.CounterValue, float64(p.scrapePartialErrors))
+	if p.cgroup != nil {
+		p.cgroup.collectSummary(ch)
+	}
 }

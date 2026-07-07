@@ -184,6 +184,10 @@ func main() {
 		showVersion = flag.Bool("version", false,
 			"print version information and exit")
 		removeEmptyGroups = flag.Bool("remove-empty-groups", false, "forget process groups with no processes")
+		cgroupfsPath      = flag.String("cgroupfs", "/sys/fs/cgroup",
+			"path to the unified cgroupv2 mount, used by the -cgroup.* metrics")
+		cgroupPSI = flag.Bool("cgroup.psi", false,
+			"export cgroupv2 pressure-stall (PSI) metrics per group (requires cgroupv2 with PSI enabled)")
 	)
 	flag.Parse()
 
@@ -210,6 +214,7 @@ func main() {
 	}
 
 	var matchnamer common.MatchNamer
+	var cgroupConfig config.CgroupConfig
 
 	if *configPath != "" {
 		if *nameMapping != "" || *procNames != "" {
@@ -222,6 +227,7 @@ func main() {
 		}
 		log.Printf("Reading metrics from %s based on %q", *procfsPath, *configPath)
 		matchnamer = cfg.MatchNamers
+		cgroupConfig = cfg.Cgroups
 		if *debug {
 			log.Printf("using config matchnamer: %v", cfg.MatchNamers)
 		}
@@ -252,6 +258,18 @@ func main() {
 		*recheck = true
 	}
 
+	// Enable cgroupv2 collection only if at least one -cgroup.* family is set.
+	// When nil, the exporter behaves exactly as it did before.
+	var cgroupOption *collector.CgroupCollectorOption
+	if *cgroupPSI {
+		cgroupOption = &collector.CgroupCollectorOption{
+			CgroupFSPath: *cgroupfsPath,
+			PSI:          *cgroupPSI,
+			Config:       cgroupConfig,
+			Debug:        *debug,
+		}
+	}
+
 	pc, err := collector.NewProcessCollector(
 		collector.ProcessCollectorOption{
 			ProcFSPath:        *procfsPath,
@@ -263,6 +281,7 @@ func main() {
 			RecheckTimeLimit:  *recheckTimeLimit,
 			Debug:             *debug,
 			RemoveEmptyGroups: *removeEmptyGroups,
+			Cgroup:            cgroupOption,
 		},
 	)
 	if err != nil {
