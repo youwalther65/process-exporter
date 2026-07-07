@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -21,7 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	verCollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promslog"
 	promVersion "github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 )
@@ -186,8 +187,17 @@ func main() {
 	)
 	flag.Parse()
 
-	promlogConfig := &promlog.Config{}
-	logger := promlog.New(promlogConfig)
+	// A /proc scraper does no CPU-bound parallel work, so a large P count only
+	// wastes memory (per-P mcaches). Cap GOMAXPROCS to keep the DaemonSet's RSS
+	// low, but honor an explicit GOMAXPROCS env override if the operator sets one.
+	if os.Getenv("GOMAXPROCS") == "" {
+		if n := runtime.GOMAXPROCS(0); n > 2 {
+			runtime.GOMAXPROCS(2)
+		}
+	}
+
+	promslogConfig := &promslog.Config{}
+	logger := promslog.New(promslogConfig)
 
 	if *showVersion {
 		fmt.Printf("%s\n", promVersion.Print("process-exporter"))
