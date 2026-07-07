@@ -1,4 +1,8 @@
-pkgs          = $(shell go list ./...)
+# Go binary to use. Override when `go` is not on PATH in make's shell (e.g. when
+# your interactive shell uses an alias): make build GO=/usr/local/go/bin/go
+GO            ?= go
+
+pkgs          = $(shell $(GO) list ./...)
 
 PREFIX                  ?= $(shell pwd)
 BIN_DIR                 ?= $(shell pwd)
@@ -27,19 +31,19 @@ style:
 
 test:
 	@echo ">> running short tests"
-	go test -short $(pkgs)
+	$(GO) test -short $(pkgs)
 
 format:
 	@echo ">> formatting code"
-	go fmt $(pkgs)
+	$(GO) fmt $(pkgs)
 
 vet:
 	@echo ">> vetting code"
-	go vet $(pkgs)
+	$(GO) vet $(pkgs)
 
 build:
 	@echo ">> building code"
-	cd cmd/process-exporter; CGO_ENABLED=0 go build -ldflags "$(VERSION_LDFLAGS)" -o ../../process-exporter -a -tags netgo
+	cd cmd/process-exporter; CGO_ENABLED=0 $(GO) build -ldflags "$(VERSION_LDFLAGS)" -o ../../process-exporter -a -tags netgo
 
 smoke:
 	@echo ">> smoke testing process-exporter"
@@ -47,13 +51,13 @@ smoke:
 
 integ:
 	@echo ">> integration testing process-exporter"
-	go build -o integration-tester cmd/integration-tester/main.go
-	go build -o load-generator cmd/load-generator/main.go
+	$(GO) build -o integration-tester cmd/integration-tester/main.go
+	$(GO) build -o load-generator cmd/load-generator/main.go
 	./integration-tester -write-size-bytes 65536
 
 install:
 	@echo ">> installing binary"
-	cd cmd/process-exporter; CGO_ENABLED=0 go install -a -tags netgo
+	cd cmd/process-exporter; CGO_ENABLED=0 $(GO) install -a -tags netgo
 
 docker:
 	@echo ">> building docker image"
@@ -64,17 +68,17 @@ docker:
 	docker run --rm --volumes-from configs "$(DOCKER_IMAGE_NAME):$(TAG_VERSION)" $(SMOKE_TEST)
 
 dockertest:
-	docker run --rm -it -v `pwd`:/go/src/github.com/ncabatoff/process-exporter golang:1.23.8  make -C /go/src/github.com/ncabatoff/process-exporter test
+	docker run --rm -it -v `pwd`:/go/src/github.com/ncabatoff/process-exporter golang:1.26  make -C /go/src/github.com/ncabatoff/process-exporter test
 
 dockerinteg:
-	docker run --rm -it -v `pwd`:/go/src/github.com/ncabatoff/process-exporter golang:1.23.8  make -C /go/src/github.com/ncabatoff/process-exporter build integ
+	docker run --rm -it -v `pwd`:/go/src/github.com/ncabatoff/process-exporter golang:1.26  make -C /go/src/github.com/ncabatoff/process-exporter build integ
 
 .PHONY: update-go-deps
 update-go-deps:
 	@echo ">> updating Go dependencies"
-	@for m in $$(go list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
-		go get $$m; \
+	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		$(GO) get $$m; \
 	done
-	go mod tidy
+	$(GO) mod tidy
 
 .PHONY: all style format test vet build integ docker
