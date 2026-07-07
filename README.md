@@ -360,6 +360,118 @@ Same as minor_page_faults_total, but broken down per-thread subgroup.
 
 Same as context_switches_total, but broken down per-thread subgroup.
 
+## cgroup v2 Metrics
+
+On hosts using the unified cgroup v2 hierarchy (e.g. Bottlerocket, most modern
+systemd distros), process-exporter can additionally export per-group metrics
+sourced from the cgroup each group's processes belong to: pressure-stall
+information (PSI) and selected cgroup stat files. This is useful when process
+groups map cleanly onto cgroups — for example systemd units under
+`runtime.slice`, where a unit's processes share one cgroup.
+
+These metrics are **opt-in and off by default**: with no `-cgroup.*` flag,
+process-exporter behaves exactly as it did before and emits no cgroup metrics.
+Each family is enabled independently, because some (notably `memory.stat`) can
+substantially increase the number of exported series.
+
+### Enabling
+
+Metric *families* are enabled with command-line flags:
+
+| Flag | Family |
+|---|---|
+| `-cgroup.psi` | pressure-stall (PSI) counters for cpu/memory/io |
+| `-cgroup.memory` | `memory.current` and selected `memory.stat` fields |
+| `-cgroup.cpu` | `cpu.stat` user/system seconds |
+| `-cgroup.pids` | `pids.current` |
+| `-cgroupfs <path>` | cgroup v2 mount point (default `/sys/fs/cgroup`) |
+
+Field-level selection (to bound cardinality) is configured in the same YAML
+config file used for `process_names`, under a top-level `cgroups:` block:
+
+```yaml
+process_names:
+  - comm:
+    - nma
+    - kubelet
+    - containerd
+
+cgroups:
+  psi:
+    # Which PSI values to export. Default: total only (a seconds counter — derive
+    # rates with rate() in PromQL). Add avg10/avg60/avg300 for the kernel's
+    # pre-computed averages (exported as the *_ratio gauge).
+    windows:
+    - total
+    - avg10
+  memory:
+    # Which memory.stat fields to export. Default when omitted:
+    # anon, file, kernel, slab, sock. memory.stat has ~40 fields, so an explicit
+    # allowlist keeps series count under control.
+    stat_fields:
+    - anon
+    - file
+    - slab
+```
+
+### Multiple cgroups per group (skip-and-count)
+
+A process group only receives cgroup metrics when *all* of its processes resolve
+to a single cgroup. If a group's processes span multiple cgroups, its cgroup
+metrics are skipped (to avoid conflating unrelated cgroups) and the
+`namedprocess_scrape_cgroup_skipped` counter is incremented. On hosts where
+groups are 1:1 with cgroups (like Bottlerocket `runtime.slice` units) this never
+trips; on hosts where several groups share a cgroup, each such group correctly
+reports that shared cgroup's values.
+
+### PSI metrics (`-cgroup.psi`)
+
+Following node_exporter's convention, the resource and the some/full distinction
+are encoded in the metric name (`waiting` = PSI *some*, `stalled` = PSI *full*).
+Only the total is exported by default, as a seconds counter.
+
+- `namedprocess_namegroup_cgroup_pressure_cpu_waiting_seconds_total`
+- `namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total`
+- `namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total`
+- `namedprocess_namegroup_cgroup_pressure_io_waiting_seconds_total`
+- `namedprocess_namegroup_cgroup_pressure_io_stalled_seconds_total`
+
+There is no `cpu_stalled` metric: the kernel's `cpu.pressure` has no *full* line
+("all tasks stalled" is meaningless for CPU).
+
+When `avg10`/`avg60`/`avg300` are requested via `cgroups.psi.windows`, the
+kernel's pre-computed averages are exported as a gauge:
+
+- `namedprocess_namegroup_cgroup_pressure_ratio` with labels `resource`
+  (`cpu`/`memory`/`io`), `kind` (`some`/`full`), and `window`
+  (`avg10`/`avg60`/`avg300`).
+
+Example — memory full-pressure rate for a group:
+
+```
+rate(namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total{groupname="nma"}[5m])
+```
+
+### memory metrics (`-cgroup.memory`)
+
+- `namedprocess_namegroup_cgroup_memory_current_bytes` gauge — `memory.current`.
+- `namedprocess_namegroup_cgroup_memory_stat_bytes` gauge — selected
+  `memory.stat` fields, with the field name in the `field` label.
+
+### cpu metrics (`-cgroup.cpu`)
+
+- `namedprocess_namegroup_cgroup_cpu_seconds_total` counter — from `cpu.stat`,
+  with the `mode` label (`user`/`system`).
+
+### pids metrics (`-cgroup.pids`)
+
+- `namedprocess_namegroup_cgroup_pids_current` gauge — `pids.current`.
+
+### scrape metric
+
+- `namedprocess_scrape_cgroup_skipped` counter — number of groups whose cgroup
+  metrics were skipped because their processes spanned multiple cgroups.
+
 ## Instrumentation cost
 
 process-exporter will consume CPU in proportion to the number of processes in
@@ -377,9 +489,15 @@ An example Grafana dashboard to view the metrics is available at https://grafana
 
 ## Building
 
-Requires Go 1.21 (at least) installed.
+Requires Go 1.26 (at least) installed.
 ```
 make
+```
+
+If `go` is not on `make`'s `PATH` (for example when your shell reaches it via an
+alias), pass its location explicitly:
+```
+make build GO=/usr/local/go/bin/go
 ```
 
 ## Exposing metrics through HTTPS
