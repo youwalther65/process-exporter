@@ -5,3 +5,4 @@ integration-tester
 dist
 /vendor
 /.vscode
+.DS_Store
