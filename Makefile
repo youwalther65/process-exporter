@@ -12,7 +12,7 @@ BRANCH      ?= $(shell git rev-parse --abbrev-ref HEAD)
 BUILDDATE   ?= $(shell date --iso-8601=seconds)
 BUILDUSER   ?= $(shell whoami)@$(shell hostname)
 REVISION    ?= $(shell git rev-parse HEAD)
-TAG_VERSION ?= $(shell git describe --tags --abbrev=0)
+TAG_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
 
 VERSION_LDFLAGS := \
   -X github.com/prometheus/common/version.Branch=$(BRANCH) \
