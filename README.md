@@ -467,6 +467,10 @@ rate(namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total{groupna
 ### memory metrics (`-cgroup.memory`)
 
 - `namedprocess_namegroup_cgroup_memory_current_bytes` gauge — `memory.current`.
+- `namedprocess_namegroup_cgroup_memory_swap_current_bytes` gauge —
+  `memory.swap.current`, the whole-cgroup analog of the per-process
+  `namedprocess_namegroup_memory_bytes{memtype="swapped"}`. Omitted when swap
+  accounting is disabled (the file is absent).
 - `namedprocess_namegroup_cgroup_memory_stat_bytes` gauge — selected
   `memory.stat` fields, with the field name in the `field` label.
 

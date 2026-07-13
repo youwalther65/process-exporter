@@ -214,10 +214,11 @@ func writeStatFixture(t *testing.T, cgroupPath string) string {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"memory.current": "104857600\n",
-		"memory.stat":    "anon 1048576\nfile 2097152\nkernel 524288\nslab 262144\nsock 131072\nunused_field 999\n",
-		"cpu.stat":       "usage_usec 9000000\nuser_usec 6000000\nsystem_usec 3000000\nnr_periods 0\n",
-		"pids.current":   "17\n",
+		"memory.current":      "104857600\n",
+		"memory.swap.current": "20971520\n",
+		"memory.stat":         "anon 1048576\nfile 2097152\nkernel 524288\nslab 262144\nsock 131072\nunused_field 999\n",
+		"cpu.stat":            "usage_usec 9000000\nuser_usec 6000000\nsystem_usec 3000000\nnr_periods 0\n",
+		"pids.current":        "17\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(unit, name), []byte(content), 0o644); err != nil {
@@ -237,12 +238,16 @@ func TestCgroupCollectorMemory(t *testing.T) {
 	}
 	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
 
-	// memory.current plus the curated default stat fields (anon/file/kernel/slab/sock).
-	// unused_field is present in the file but not allowlisted, so must not appear.
+	// memory.current, memory.swap.current, plus the curated default stat fields
+	// (anon/file/kernel/slab/sock). unused_field is present in the file but not
+	// allowlisted, so must not appear.
 	const want = `
 # HELP namedprocess_namegroup_cgroup_memory_current_bytes Total memory currently in use by this group's cgroup (memory.current).
 # TYPE namedprocess_namegroup_cgroup_memory_current_bytes gauge
 namedprocess_namegroup_cgroup_memory_current_bytes{groupname="nma"} 1.048576e+08
+# HELP namedprocess_namegroup_cgroup_memory_swap_current_bytes Swap currently in use by this group's cgroup (memory.swap.current); the whole-cgroup analog of per-process memory_bytes{memtype="swapped"}.
+# TYPE namedprocess_namegroup_cgroup_memory_swap_current_bytes gauge
+namedprocess_namegroup_cgroup_memory_swap_current_bytes{groupname="nma"} 2.097152e+07
 # HELP namedprocess_namegroup_cgroup_memory_stat_bytes Selected memory.stat fields for this group's cgroup.
 # TYPE namedprocess_namegroup_cgroup_memory_stat_bytes gauge
 namedprocess_namegroup_cgroup_memory_stat_bytes{field="anon",groupname="nma"} 1.048576e+06
@@ -253,9 +258,39 @@ namedprocess_namegroup_cgroup_memory_stat_bytes{field="sock",groupname="nma"} 13
 `
 	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
 		"namedprocess_namegroup_cgroup_memory_current_bytes",
+		"namedprocess_namegroup_cgroup_memory_swap_current_bytes",
 		"namedprocess_namegroup_cgroup_memory_stat_bytes",
 	); err != nil {
 		t.Error(err)
+	}
+}
+
+// TestCgroupCollectorMemorySwapAbsent verifies the swap metric is simply omitted
+// (no panic, no zero) when memory.swap.current is missing — e.g. swap accounting
+// disabled — while memory.current is still emitted.
+func TestCgroupCollectorMemorySwapAbsent(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	// Fixture with memory.current but no memory.swap.current.
+	root := t.TempDir()
+	unit := filepath.Join(root, strings.Trim(path, "/"))
+	if err := os.MkdirAll(unit, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unit, "memory.current"), []byte("104857600\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, Memory: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_memory_swap_current_bytes"); n != 0 {
+		t.Errorf("expected no swap series when memory.swap.current absent, got %d", n)
+	}
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_memory_current_bytes"); n != 1 {
+		t.Errorf("expected memory.current still emitted, got %d", n)
 	}
 }
 

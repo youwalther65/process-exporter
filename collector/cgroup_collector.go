@@ -92,6 +92,11 @@ var (
 		"Total memory currently in use by this group's cgroup (memory.current).",
 		[]string{"groupname"}, nil)
 
+	memorySwapCurrentDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_memory_swap_current_bytes",
+		"Swap currently in use by this group's cgroup (memory.swap.current); the whole-cgroup analog of per-process memory_bytes{memtype=\"swapped\"}.",
+		[]string{"groupname"}, nil)
+
 	memoryStatDesc = prometheus.NewDesc(
 		"namedprocess_namegroup_cgroup_memory_stat_bytes",
 		"Selected memory.stat fields for this group's cgroup.",
@@ -185,6 +190,7 @@ func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 	ch <- psiPercentDesc
 	ch <- cgroupSkippedDesc
 	ch <- memoryCurrentDesc
+	ch <- memorySwapCurrentDesc
 	ch <- memoryStatDesc
 	ch <- cgroupCPUDesc
 	ch <- pidsCurrentDesc
@@ -224,12 +230,21 @@ func (c *cgroupCollector) collectGroup(ch chan<- prometheus.Metric, gname string
 	}
 }
 
-// collectMemory emits memory.current and the allowlisted memory.stat fields.
+// collectMemory emits memory.current, memory.swap.current and the allowlisted
+// memory.stat fields.
 func (c *cgroupCollector) collectMemory(ch chan<- prometheus.Metric, gname, cgroupPath string) {
 	if cur, err := c.reader.ReadUint64(cgroupPath, "memory.current"); err != nil {
 		c.debugf("group %q: reading memory.current: %v", gname, err)
 	} else {
 		ch <- prometheus.MustNewConstMetric(memoryCurrentDesc, prometheus.GaugeValue, float64(cur), gname)
+	}
+
+	// memory.swap.current is absent when swap accounting is disabled; a read
+	// error is skipped like any other missing file so we degrade gracefully.
+	if sw, err := c.reader.ReadUint64(cgroupPath, "memory.swap.current"); err != nil {
+		c.debugf("group %q: reading memory.swap.current: %v", gname, err)
+	} else {
+		ch <- prometheus.MustNewConstMetric(memorySwapCurrentDesc, prometheus.GaugeValue, float64(sw), gname)
 	}
 
 	stat, err := c.reader.ReadKeyed(cgroupPath, "memory.stat")
