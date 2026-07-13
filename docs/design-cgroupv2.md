@@ -90,30 +90,37 @@ fork evaluator / upstream reviewer sees them.
    `cpu_stalled_seconds_total` descriptor; older kernels emit nothing (Full is
    nil).
 
-### Worth a doc note / follow-up
+### Fixed (2026-07-13, follow-up pass)
 
-5. **cgroup-namespace assumption.** Paths from `/proc/<pid>/cgroup` are relative
-   to the exporter's own cgroup namespace. Works with `hostPID: true` (the
-   validated deployment); without it, reads ENOENT and are swallowed at debug
-   level → zero cgroup metrics, no error. Document as a precondition.
-6. **Transient empty/conflict groups drop cgroup counters** → false counter
-   resets in `rate()`/`increase()` (cgroup counters have no accumulator like the
-   process counters do).
-7. **Mixed empty-path procs skip conflict detection** (`grouper.go`): a group
-   where some procs report `""` resolves to the non-empty subset's cgroup with
-   no `skipped` increment — cgroup and process metrics can then describe
-   different populations.
-8. **`os.Root` handle is never `Close()`d** and is leaked on the
-   `NewProcessCollector` error path (low severity — one fd for process lifetime).
+7. **Mixed empty-path procs now flag a conflict** (`grouper.go`): a group where
+   some procs report `""` and others a real path is treated as a conflict
+   (skip-and-count) instead of silently resolving to the non-empty subset.
+   Detection is order-independent (tracks `cgroupV2SawEmpty`). Covered by two new
+   mixed-order cases in `TestGrouperCgroupV2Path`.
+8. **`os.Root` handle released on the error path**: `NewProcessCollector` now
+   calls `cgroupCollector.close()` when the first `Update` fails, so the root fd
+   isn't leaked. (Steady-state lifetime is still process-long by design.)
+10. **Removed dead `Reader.exists()`** (+ its test and the now-unused `io/fs`
+    import) and collapsed the three copy-pasted `avg10/60/300` ParseFloat blocks
+    in `psi.go` into a single key→field map.
 
-### Quality (optional)
+### Won't fix / documented instead
 
-9. **`PSILine`/`PSIStats` duplicate the vendored `prometheus/procfs` types** of
-   the same name/shape. `procfs.PSIStatsForResource` is hardcoded to
-   `/proc/pressure`, so the file read can't be reused, but the structs could be.
-10. **Dead `Reader.exists()`** (only used in tests; its doc claims a production
-    role it lacks) and three copy-pasted `avg10/60/300` ParseFloat blocks in
-    `psi.go` (a single `fmt.Sscanf`, as procfs does, would collapse them).
+5. **cgroup-namespace assumption** — paths from `/proc/<pid>/cgroup` are relative
+   to the exporter's own cgroup namespace; needs `hostPID: true` (without it,
+   reads ENOENT and degrade to zero cgroup metrics). This is a deployment
+   precondition, not a code bug — documented in the `docs/examples/` manifests
+   and their README.
+6. **Transient empty/conflict groups drop cgroup counters** → possible false
+   `rate()`/`increase()` resets. Giving cgroup counters a full accumulator (like
+   the process counters) is disproportionate to the value; accepted as a known
+   limitation. Fix #7 slightly widens when a group is skipped (mixed
+   empty/non-empty) — the correct trade: skip-and-count over silent
+   misattribution.
+9. **`PSILine`/`PSIStats` duplicate the vendored `prometheus/procfs` types** —
+   left as-is deliberately. procfs's parser is unexported and its public entry is
+   hardcoded to `/proc/pressure`, so only the structs could be reused; coupling
+   our parser to an external package's types for cosmetic dedup isn't worth it.
 
 ## Testing
 

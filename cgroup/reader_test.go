@@ -48,22 +48,6 @@ func TestReaderReadPSI(t *testing.T) {
 	}
 }
 
-func TestReaderExists(t *testing.T) {
-	root := writeFakeCgroupfs(t)
-	r, err := NewReader(root)
-	if err != nil {
-		t.Fatalf("NewReader: %v", err)
-	}
-	defer r.Close()
-
-	if !r.exists("/runtime.slice/containerd.service", "cpu.pressure") {
-		t.Error("cpu.pressure should exist")
-	}
-	if r.exists("/runtime.slice/containerd.service", "io.pressure") {
-		t.Error("io.pressure should not exist")
-	}
-}
-
 // TestReaderRefusesEscape verifies os.Root confinement: a path that tries to
 // climb out of the cgroupfs root must fail rather than read an outside file.
 func TestReaderRefusesEscape(t *testing.T) {

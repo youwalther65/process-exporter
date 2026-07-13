@@ -180,6 +180,14 @@ func resolvePSIWindows(windows []string) map[string]bool {
 	return set
 }
 
+// close releases the cgroupfs root handle. Safe to call on a nil collector or
+// one whose reader failed to open.
+func (c *cgroupCollector) close() {
+	if c != nil && c.reader != nil {
+		c.reader.Close()
+	}
+}
+
 func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 	ch <- psiCPUWaitingDesc
 	ch <- psiCPUStalledDesc

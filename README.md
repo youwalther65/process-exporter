@@ -385,6 +385,12 @@ Ready-to-adapt deployment manifests and a Grafana dashboard (optimised for
 **Amazon EKS Auto Mode** / Bottlerocket) are in
 [`docs/examples/`](docs/examples/).
 
+> **Precondition when running containerized (DaemonSet):** the collector reads
+> each process's cgroup path from `/proc/<pid>/cgroup`, which is relative to the
+> reader's cgroup namespace. Run with **`hostPID: true`** (and mount the host
+> `/proc` and `/sys/fs/cgroup`) so those paths resolve against the host cgroupfs.
+> Without it, reads fail and the cgroup metrics are silently empty.
+
 ### Enabling
 
 Metric *families* are enabled with command-line flags:

@@ -49,6 +49,13 @@ type (
 		// unrelated cgroups) — see the skip-and-count policy.
 		CgroupV2Path     string
 		CgroupV2Conflict bool
+		// CgroupV2SawEmpty records that at least one proc reported no v2 cgroup
+		// path. Combined with a non-empty path in the same group this is a
+		// conflict: the group's procs don't all resolve to one cgroup, so the
+		// cgroup metrics would describe a different population than the process
+		// metrics. Tracked here so the empty/non-empty mix is detected
+		// regardless of the order procs are accumulated.
+		CgroupV2SawEmpty bool
 	}
 )
 
@@ -99,12 +106,21 @@ func groupadd(grp Group, ts Update) Group {
 	}
 
 	// Track the group's cgroupv2 path, flagging a conflict if procs disagree.
-	// Empty paths (procs with no v2 cgroup) neither set nor conflict. Once a
-	// conflict is seen it sticks for the cycle, so cgroup metrics are skipped.
-	if !grp.CgroupV2Conflict && ts.CgroupV2Path != "" {
-		if grp.CgroupV2Path == "" {
+	// A conflict is any of: two differing non-empty paths, OR a mix of empty and
+	// non-empty (some proc has no v2 cgroup while another does) — in both cases
+	// the group's procs don't all resolve to one cgroup, so cgroup metrics would
+	// describe a different population than the process metrics. Once set, the
+	// conflict sticks for the cycle and cgroup metrics are skip-and-counted.
+	if !grp.CgroupV2Conflict {
+		if ts.CgroupV2Path == "" {
+			grp.CgroupV2SawEmpty = true
+		} else if grp.CgroupV2Path == "" {
 			grp.CgroupV2Path = ts.CgroupV2Path
 		} else if grp.CgroupV2Path != ts.CgroupV2Path {
+			grp.CgroupV2Conflict = true
+		}
+		// Empty seen together with a resolved path -> mixed membership.
+		if grp.CgroupV2SawEmpty && grp.CgroupV2Path != "" {
 			grp.CgroupV2Conflict = true
 		}
 	}

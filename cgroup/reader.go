@@ -2,7 +2,6 @@ package cgroup
 
 import (
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,10 +83,3 @@ func (r *Reader) ReadKeyed(cgroupPath, name string) (map[string]uint64, error) {
 	return ParseKeyed(content)
 }
 
-// exists reports whether name exists under cgroupPath. Used to detect kernels
-// or cgroups where PSI is not enabled (the *.pressure files are absent).
-func (r *Reader) exists(cgroupPath, name string) bool {
-	rel := filepath.Join(strings.Trim(cgroupPath, "/"), name)
-	_, err := fs.Stat(r.root.FS(), rel)
-	return err == nil
-}

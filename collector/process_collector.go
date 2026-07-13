@@ -213,6 +213,11 @@ func NewProcessCollector(options ProcessCollectorOption) (*NamedProcessCollector
 		if options.Debug {
 			log.Print(err)
 		}
+		// Release the cgroup reader's root fd on the error path so it isn't
+		// leaked when construction fails after the collector was created.
+		if p.cgroup != nil {
+			p.cgroup.close()
+		}
 		return nil, err
 	}
 	p.scrapePartialErrors += colErrs.Partial

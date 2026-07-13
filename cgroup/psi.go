@@ -74,39 +74,33 @@ func parsePSILine(line string) (string, *PSILine, error) {
 	}
 	kind := fields[0]
 	psi := &PSILine{}
+	// Map each avg key to its destination field so the three parse the same way.
+	avgFields := map[string]*float64{
+		"avg10":  &psi.Avg10,
+		"avg60":  &psi.Avg60,
+		"avg300": &psi.Avg300,
+	}
 	for _, kv := range fields[1:] {
 		key, val, found := strings.Cut(kv, "=")
 		if !found {
 			return "", nil, fmt.Errorf("malformed PSI field %q in line %q", kv, line)
 		}
-		switch key {
-		case "avg10":
+		if dst, ok := avgFields[key]; ok {
 			f, err := strconv.ParseFloat(val, 64)
 			if err != nil {
-				return "", nil, fmt.Errorf("bad avg10 %q: %v", val, err)
+				return "", nil, fmt.Errorf("bad %s %q: %v", key, val, err)
 			}
-			psi.Avg10 = f
-		case "avg60":
-			f, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				return "", nil, fmt.Errorf("bad avg60 %q: %v", val, err)
-			}
-			psi.Avg60 = f
-		case "avg300":
-			f, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				return "", nil, fmt.Errorf("bad avg300 %q: %v", val, err)
-			}
-			psi.Avg300 = f
-		case "total":
+			*dst = f
+			continue
+		}
+		if key == "total" {
 			u, err := strconv.ParseUint(val, 10, 64)
 			if err != nil {
 				return "", nil, fmt.Errorf("bad total %q: %v", val, err)
 			}
 			psi.Total = u
-		default:
-			// Ignore unknown keys so we tolerate future kernel additions.
 		}
+		// Ignore unknown keys so we tolerate future kernel additions.
 	}
 	return kind, psi, nil
 }
