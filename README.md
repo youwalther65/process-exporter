@@ -1,6 +1,13 @@
 # process-exporter
 Prometheus exporter that mines /proc to report on selected processes.
 
+> **This is a maintained fork of [ncabatoff/process-exporter](https://github.com/ncabatoff/process-exporter).**
+> It tracks upstream and adds **opt-in cgroup v2 metrics** — pressure-stall
+> information (PSI) plus `memory`/`cpu`/`pids` cgroup stats — exported per process
+> group. These are off by default (`-cgroup.*` flags); with no flag the exporter
+> behaves exactly as upstream. See [cgroup v2 Metrics](#cgroup-v2-metrics) below
+> and [`docs/design-cgroupv2.md`](docs/design-cgroupv2.md) for the design.
+
 [release]: https://github.com/ncabatoff/process-exporter/releases/latest
 
 [![Release](https://img.shields.io/github/release/ncabatoff/process-exporter.svg?style=flat-square")][release]
