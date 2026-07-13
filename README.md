@@ -526,6 +526,40 @@ alias), pass its location explicitly:
 make build GO=/usr/local/go/bin/go
 ```
 
+### Building a container image
+
+The Dockerfile builds a `FROM scratch` image. To publish a multi-arch image
+(amd64 + arm64 — the arm64 build is required for Graviton / arm nodes) to your
+own registry, use `docker buildx`. Substitute `YOUR_REGISTRY` (e.g. a Docker Hub
+user, GHCR path, or ECR registry host) throughout:
+
+```bash
+REGISTRY=YOUR_REGISTRY          # e.g. ghcr.io/you, or <acct>.dkr.ecr.<region>.amazonaws.com
+REPO=process-exporter
+TAG=$(git rev-parse --short HEAD)
+
+# One-time on an amd64 host, to cross-build arm64:
+docker run --privileged --rm tonistiigi/binfmt --install all
+docker buildx create --name multiarch --driver docker-container --use
+
+# Log in to your registry first (registry-specific), then build + push both
+# arches as a single manifest. --push is required for multi-arch; you cannot
+# --load two architectures into the local daemon.
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t "${REGISTRY}/${REPO}:${TAG}" \
+  -t "${REGISTRY}/${REPO}:latest" \
+  --push .
+
+# Verify both arches are present in the pushed manifest list:
+docker buildx imagetools inspect "${REGISTRY}/${REPO}:${TAG}"
+```
+
+Set the resulting image in your deployment (see the DaemonSet in
+[`docs/examples/`](docs/examples/), which pins the image and enables the
+`-cgroup.*` families). Because that manifest pins by digest, redeploys use the
+`sha256:...` **index** digest from `imagetools inspect`, not the tag.
+
 ## Exposing metrics through HTTPS
 
 web-config.yml

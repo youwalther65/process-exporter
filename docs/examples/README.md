@@ -15,6 +15,7 @@ the placeholders for your environment.
 
 - **Image**: replace `YOUR_REGISTRY/process-exporter:latest` in
   `process-exporter-daemonset.yaml` with your built image. See the repo README
+  section [**Building a container image**](../../README.md#building-a-container-image)
   for the multi-arch (amd64 + arm64) buildx + push flow — the arm64 image is
   required for Graviton nodes.
 - **Namespace**: the examples use `monitoring`. Change it consistently across all
