@@ -1,0 +1,88 @@
+# NMA (eks-node-monitoring-agent) metrics proxy — optional companion for EKS
+# Auto Mode.
+#
+# Why: on EKS Auto Mode the eks-node-monitoring-agent exposes Go-runtime metrics
+# (go_memstats_*, go_goroutines, GC stats) on a loopback port that Prometheus
+# cannot scrape directly. This tiny hostNetwork nginx DaemonSet reverse-proxies
+# that endpoint to a node port (9259) so Prometheus can scrape it, which powers
+# the "NMA Go Runtime" section of the combined Grafana dashboard.
+#
+# This is EKS-Auto-Mode specific and entirely optional — skip it if you don't run
+# the eks-node-monitoring-agent or don't need its Go-runtime metrics.
+#
+# NOTE: confirm the upstream NMA metrics port. This example proxies to
+# 127.0.0.1:8801; adjust proxy_pass below to match your NMA build.
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nma-metrics-proxy
+  namespace: monitoring
+  labels:
+    app: nma-metrics-proxy
+spec:
+  selector:
+    matchLabels:
+      app: nma-metrics-proxy
+  template:
+    metadata:
+      labels:
+        app: nma-metrics-proxy
+      # Scrape annotations are on the POD here (not a Service as in the
+      # process-exporter example) because this pod is hostNetwork: true — its IP
+      # is the node IP and a ClusterIP Service would add no value. Prometheus
+      # picks it up via the kubernetes-pods job. (Use pod OR service annotations,
+      # never both, or each target is scraped twice.)
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9259"
+    spec:
+      # Run on every node. Auto Mode's built-in "system" NodePool taints its
+      # nodes with CriticalAddonsOnly; tolerate everything to cover them too.
+      tolerations:
+        - operator: Exists
+      hostNetwork: true
+      containers:
+        - name: proxy
+          image: nginx:alpine
+          ports:
+            - containerPort: 9259
+              hostPort: 9259
+              name: metrics
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          resources:
+            requests:
+              cpu: 5m
+              memory: 8Mi
+            limits:
+              memory: 32Mi
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: nma-metrics-proxy-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nma-metrics-proxy-config
+  namespace: monitoring
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 16; }
+    http {
+      server {
+        listen 9259;
+        location /metrics {
+          # Adjust to the NMA metrics endpoint on the host.
+          proxy_pass http://127.0.0.1:8801/metrics;
+        }
+        location / {
+          return 200 'nma-metrics-proxy\n';
+        }
+      }
+    }

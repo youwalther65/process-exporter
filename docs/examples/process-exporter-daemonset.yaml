@@ -1,0 +1,165 @@
+# process-exporter with cgroup v2 metrics (PSI / memory / cpu / pids),
+# optimised for Amazon EKS Auto Mode (Bottlerocket nodes).
+#
+# Bottlerocket runs the unified cgroup v2 hierarchy with PSI enabled, so mounting
+# the host /proc and /sys/fs/cgroup gives the collector everything it needs. The
+# cgroup v2 families are opt-in via the -cgroup.* flags below; with none set the
+# exporter behaves exactly like upstream.
+#
+# Substitute before applying:
+#   image: YOUR_REGISTRY/process-exporter:latest   -> your built image
+# See docs/design-cgroupv2.md and the README "cgroup v2 Metrics" section.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: process-exporter-config
+  namespace: monitoring
+data:
+  process-exporter.yml: |
+    # EKS Auto Mode / Bottlerocket system components. comm is truncated to 15
+    # chars by the kernel, hence the shortened names (eks-node-monito, etc.).
+    process_names:
+      - name: kubelet
+        comm:
+          - kubelet
+      - name: containerd
+        comm:
+          - containerd
+      - name: ipamd
+        comm:
+          - ipamd
+      - name: eks-healthchecker
+        comm:
+          - eks-healthcheck
+      - name: eks-node-monitoring-agent
+        comm:
+          - eks-node-monito
+      - name: csi-node-driver
+        comm:
+          - csi-node-driver
+      - name: kube-proxy
+        comm:
+          - kube-proxy
+      - name: coredns
+        comm:
+          - coredns
+      - name: eks-pod-identity-agent
+        comm:
+          - eks-pod-identit
+
+    # cgroup v2 field-level selection. Metric *families* are turned on by the
+    # -cgroup.* flags in the DaemonSet args; this block only bounds cardinality.
+    cgroups:
+      psi:
+        # Emit the seconds counters (total) plus the kernel avg10/60/300 gauges.
+        windows:
+          - total
+          - avg10
+          - avg60
+          - avg300
+      memory:
+        # memory.stat has ~40 fields; keep an explicit allowlist.
+        stat_fields:
+          - anon
+          - file
+          - slab
+          - sock
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: process-exporter
+  namespace: monitoring
+  labels:
+    app: process-exporter
+spec:
+  selector:
+    matchLabels:
+      app: process-exporter
+  template:
+    metadata:
+      labels:
+        app: process-exporter
+      # NOTE: scrape annotations live on the Service below (role: endpoints).
+      # Do not also annotate the pod template, or Prometheus scrapes each pod
+      # twice (job=kubernetes-pods AND job=kubernetes-service-endpoints).
+    spec:
+      # Run on every node. EKS Auto Mode's built-in "system" NodePool taints its
+      # nodes with CriticalAddonsOnly:NoSchedule (general-purpose nodes are
+      # untainted); tolerating everything ensures the DaemonSet also covers
+      # system nodes. Narrow this if you only want a subset.
+      tolerations:
+        - operator: Exists
+      hostPID: true
+      containers:
+        - name: process-exporter
+          # Substitute with your built image (see docs/build/README or the repo
+          # README for the multi-arch buildx + push flow).
+          image: YOUR_REGISTRY/process-exporter:latest
+          securityContext:
+            privileged: true
+          args:
+            - --procfs=/host/proc
+            - --config.path=/config/process-exporter.yml
+            # Don't fold foreign-cgroup children into daemon groups, so each
+            # group stays within its own cgroup (cleaner 1:1 cgroup attribution,
+            # fewer skip-and-count events). Trade-off: child process usage no
+            # longer rolls up into the parent's *process* metrics.
+            - --children=false
+            # cgroup v2 collector: mount + enabled families.
+            - --cgroupfs=/host/sys/fs/cgroup
+            - --cgroup.psi
+            - --cgroup.memory
+            - --cgroup.cpu
+            - --cgroup.pids
+          ports:
+            - containerPort: 9256
+              name: metrics
+              hostPort: 9256
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /host/sys/fs/cgroup
+              readOnly: true
+            - name: config
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+        - name: config
+          configMap:
+            name: process-exporter-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: process-exporter
+  namespace: monitoring
+  labels:
+    app: process-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9256"
+spec:
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: 9256
+      targetPort: 9256
+  selector:
+    app: process-exporter

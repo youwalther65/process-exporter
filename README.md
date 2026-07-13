@@ -381,6 +381,10 @@ process-exporter behaves exactly as it did before and emits no cgroup metrics.
 Each family is enabled independently, because some (notably `memory.stat`) can
 substantially increase the number of exported series.
 
+Ready-to-adapt deployment manifests and a Grafana dashboard (optimised for
+**Amazon EKS Auto Mode** / Bottlerocket) are in
+[`docs/examples/`](docs/examples/).
+
 ### Enabling
 
 Metric *families* are enabled with command-line flags:
