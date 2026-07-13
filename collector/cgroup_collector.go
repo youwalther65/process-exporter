@@ -47,6 +47,13 @@ var (
 		"Total time procs in this group's cgroup were stalled waiting on CPU (PSI some).",
 		[]string{"groupname"}, nil)
 
+	// cpu.pressure gained a "full" line in Linux 5.13; on older kernels the
+	// line is absent and ReadPSI returns Full == nil, so this stays unemitted.
+	psiCPUStalledDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pressure_cpu_stalled_seconds_total",
+		"Total time all procs in this group's cgroup were stalled on CPU (PSI full, Linux >= 5.13).",
+		[]string{"groupname"}, nil)
+
 	psiMemoryWaitingDesc = prometheus.NewDesc(
 		"namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total",
 		"Total time some proc in this group's cgroup was stalled on memory (PSI some).",
@@ -67,10 +74,12 @@ var (
 		"Total time all procs in this group's cgroup were stalled on IO (PSI full).",
 		[]string{"groupname"}, nil)
 
-	// Opt-in PSI averages. The window (avg10/avg60/avg300) is a label.
-	psiRatioDesc = prometheus.NewDesc(
-		"namedprocess_namegroup_cgroup_pressure_ratio",
-		"Kernel-computed PSI average (percent stalled) over the labelled window.",
+	// Opt-in PSI averages. The window (avg10/avg60/avg300) is a label. The
+	// kernel reports these as percentages (0-100), so the metric is named
+	// _percent rather than _ratio (which by convention would be 0-1).
+	psiPercentDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pressure_percent",
+		"Kernel-computed PSI average, percent of wall time stalled (0-100), over the labelled window.",
 		[]string{"groupname", "resource", "kind", "window"}, nil)
 
 	cgroupSkippedDesc = prometheus.NewDesc(
@@ -103,12 +112,16 @@ var (
 // cgroup path and emits them. It is created only when at least one family is
 // enabled; when nil, the exporter behaves exactly as upstream.
 type cgroupCollector struct {
-	reader        *cgroup.Reader
-	psi           bool
-	memory        bool
-	cpu           bool
-	pids          bool
-	emitAverages  bool
+	reader *cgroup.Reader
+	psi    bool
+	memory bool
+	cpu    bool
+	pids   bool
+	// psiWindows is the set of PSI windows to emit, resolved from config.
+	// "total" gates the *_seconds_total counters; "avg10"/"avg60"/"avg300"
+	// each gate one _pressure_percent series. Empty config defaults to
+	// {"total"} so behavior matches "total only".
+	psiWindows    map[string]bool
 	memStatFields []string
 	debug         bool
 
@@ -137,31 +150,39 @@ func newCgroupCollector(opt CgroupCollectorOption) (*cgroupCollector, error) {
 		memory:        opt.Memory,
 		cpu:           opt.CPU,
 		pids:          opt.Pids,
-		emitAverages:  psiWindowsIncludeAverages(opt.Config.PSIWindows),
+		psiWindows:    resolvePSIWindows(opt.Config.PSIWindows),
 		memStatFields: memStatFields,
 		debug:         opt.Debug,
 	}, nil
 }
 
-// psiWindowsIncludeAverages reports whether the configured PSI windows request
-// any of the avg10/60/300 averages (anything other than the default "total").
-func psiWindowsIncludeAverages(windows []string) bool {
+// resolvePSIWindows turns the configured window list into a lookup set,
+// silently ignoring unknown entries. An empty/absent list defaults to
+// {"total"}: emit the *_seconds_total counters and no averages, matching the
+// documented default. A list that names only averages disables totals, exactly
+// as configured.
+func resolvePSIWindows(windows []string) map[string]bool {
+	if len(windows) == 0 {
+		return map[string]bool{"total": true}
+	}
+	set := make(map[string]bool, len(windows))
 	for _, w := range windows {
 		switch w {
-		case "avg10", "avg60", "avg300":
-			return true
+		case "total", "avg10", "avg60", "avg300":
+			set[w] = true
 		}
 	}
-	return false
+	return set
 }
 
 func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 	ch <- psiCPUWaitingDesc
+	ch <- psiCPUStalledDesc
 	ch <- psiMemoryWaitingDesc
 	ch <- psiMemoryStalledDesc
 	ch <- psiIOWaitingDesc
 	ch <- psiIOStalledDesc
-	ch <- psiRatioDesc
+	ch <- psiPercentDesc
 	ch <- cgroupSkippedDesc
 	ch <- memoryCurrentDesc
 	ch <- memoryStatDesc
@@ -181,7 +202,11 @@ func (c *cgroupCollector) collectGroup(ch chan<- prometheus.Metric, gname string
 		}
 		return
 	}
-	if group.CgroupV2Path == "" {
+	// An empty path means no proc reported a v2 cgroup. A "/" path is the
+	// machine-wide root cgroup, which shows up on hybrid/v1-with-empty-v2 hosts
+	// (procs report "0::/"); emitting it would mislabel host-root totals as this
+	// group's own metrics, so skip both.
+	if group.CgroupV2Path == "" || group.CgroupV2Path == "/" {
 		return
 	}
 
@@ -257,14 +282,16 @@ func (c *cgroupCollector) debugf(format string, args ...interface{}) {
 // silently skipped so the collector degrades gracefully.
 func (c *cgroupCollector) collectPSI(ch chan<- prometheus.Metric, gname, cgroupPath string) {
 	// resource -> (some desc, full desc). A nil full desc means the resource
-	// has no meaningful "full" line to export (cpu).
+	// never has a "full" line to export. cpu.pressure emits "full" only on
+	// Linux >= 5.13; on older kernels ReadPSI returns Full == nil, so a
+	// non-nil fullDesc here is still safe (nothing is emitted when Full is nil).
 	type psiTarget struct {
 		resource string
 		someDesc *prometheus.Desc
 		fullDesc *prometheus.Desc
 	}
 	targets := []psiTarget{
-		{"cpu", psiCPUWaitingDesc, nil},
+		{"cpu", psiCPUWaitingDesc, psiCPUStalledDesc},
 		{"memory", psiMemoryWaitingDesc, psiMemoryStalledDesc},
 		{"io", psiIOWaitingDesc, psiIOStalledDesc},
 	}
@@ -278,26 +305,34 @@ func (c *cgroupCollector) collectPSI(ch chan<- prometheus.Metric, gname, cgroupP
 			continue
 		}
 		if stats.Some != nil {
-			ch <- prometheus.MustNewConstMetric(tgt.someDesc,
-				prometheus.CounterValue, float64(stats.Some.Total)/microsecondsPerSecond, gname)
-			if c.emitAverages {
-				c.emitRatios(ch, gname, tgt.resource, "some", *stats.Some)
+			if c.psiWindows["total"] {
+				ch <- prometheus.MustNewConstMetric(tgt.someDesc,
+					prometheus.CounterValue, float64(stats.Some.Total)/microsecondsPerSecond, gname)
 			}
+			c.emitPercents(ch, gname, tgt.resource, "some", *stats.Some)
 		}
 		if stats.Full != nil && tgt.fullDesc != nil {
-			ch <- prometheus.MustNewConstMetric(tgt.fullDesc,
-				prometheus.CounterValue, float64(stats.Full.Total)/microsecondsPerSecond, gname)
-			if c.emitAverages {
-				c.emitRatios(ch, gname, tgt.resource, "full", *stats.Full)
+			if c.psiWindows["total"] {
+				ch <- prometheus.MustNewConstMetric(tgt.fullDesc,
+					prometheus.CounterValue, float64(stats.Full.Total)/microsecondsPerSecond, gname)
 			}
+			c.emitPercents(ch, gname, tgt.resource, "full", *stats.Full)
 		}
 	}
 }
 
-func (c *cgroupCollector) emitRatios(ch chan<- prometheus.Metric, gname, resource, kind string, line cgroup.PSILine) {
-	ch <- prometheus.MustNewConstMetric(psiRatioDesc, prometheus.GaugeValue, line.Avg10, gname, resource, kind, "avg10")
-	ch <- prometheus.MustNewConstMetric(psiRatioDesc, prometheus.GaugeValue, line.Avg60, gname, resource, kind, "avg60")
-	ch <- prometheus.MustNewConstMetric(psiRatioDesc, prometheus.GaugeValue, line.Avg300, gname, resource, kind, "avg300")
+// emitPercents emits the kernel's pre-computed avgN percentages, one series per
+// window named in the config allowlist.
+func (c *cgroupCollector) emitPercents(ch chan<- prometheus.Metric, gname, resource, kind string, line cgroup.PSILine) {
+	if c.psiWindows["avg10"] {
+		ch <- prometheus.MustNewConstMetric(psiPercentDesc, prometheus.GaugeValue, line.Avg10, gname, resource, kind, "avg10")
+	}
+	if c.psiWindows["avg60"] {
+		ch <- prometheus.MustNewConstMetric(psiPercentDesc, prometheus.GaugeValue, line.Avg60, gname, resource, kind, "avg60")
+	}
+	if c.psiWindows["avg300"] {
+		ch <- prometheus.MustNewConstMetric(psiPercentDesc, prometheus.GaugeValue, line.Avg300, gname, resource, kind, "avg300")
+	}
 }
 
 // collectSummary emits the collector-wide counters (once per scrape).

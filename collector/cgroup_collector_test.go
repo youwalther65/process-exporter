@@ -93,21 +93,76 @@ func TestCgroupCollectorAveragesOptIn(t *testing.T) {
 	root := writeFixtureCgroupfs(t, path,
 		"some avg10=1.00 avg60=2.00 avg300=3.00 total=2000000\n")
 
-	tc := newTestCollector(t, root, config.CgroupConfig{PSIWindows: []string{"total", "avg10"}}, proc.GroupByName{
+	// windows names only avg10 (no "total"): exactly one percent series, and no
+	// *_seconds_total counter. This is the per-window allowlist honored.
+	tc := newTestCollector(t, root, config.CgroupConfig{PSIWindows: []string{"avg10"}}, proc.GroupByName{
 		"nma": proc.Group{CgroupV2Path: path},
 	})
 
 	const want = `
-# HELP namedprocess_namegroup_cgroup_pressure_ratio Kernel-computed PSI average (percent stalled) over the labelled window.
-# TYPE namedprocess_namegroup_cgroup_pressure_ratio gauge
-namedprocess_namegroup_cgroup_pressure_ratio{groupname="nma",kind="some",resource="memory",window="avg10"} 1
-namedprocess_namegroup_cgroup_pressure_ratio{groupname="nma",kind="some",resource="memory",window="avg300"} 3
-namedprocess_namegroup_cgroup_pressure_ratio{groupname="nma",kind="some",resource="memory",window="avg60"} 2
+# HELP namedprocess_namegroup_cgroup_pressure_percent Kernel-computed PSI average, percent of wall time stalled (0-100), over the labelled window.
+# TYPE namedprocess_namegroup_cgroup_pressure_percent gauge
+namedprocess_namegroup_cgroup_pressure_percent{groupname="nma",kind="some",resource="memory",window="avg10"} 1
 `
 	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
-		"namedprocess_namegroup_cgroup_pressure_ratio",
+		"namedprocess_namegroup_cgroup_pressure_percent",
 	); err != nil {
 		t.Error(err)
+	}
+
+	// The counter must NOT be emitted when "total" is absent from windows.
+	if n := testutil.CollectAndCount(tc,
+		"namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total"); n != 0 {
+		t.Errorf("expected no memory-waiting counter when 'total' not in windows, got %d", n)
+	}
+}
+
+// TestCgroupCollectorWindowAllowlist verifies each window is gated
+// independently: [total, avg60] emits the counter and only the avg60 percent.
+func TestCgroupCollectorWindowAllowlist(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeFixtureCgroupfs(t, path,
+		"some avg10=1.00 avg60=2.00 avg300=3.00 total=2000000\n")
+
+	tc := newTestCollector(t, root, config.CgroupConfig{PSIWindows: []string{"total", "avg60"}}, proc.GroupByName{
+		"nma": proc.Group{CgroupV2Path: path},
+	})
+
+	const want = `
+# HELP namedprocess_namegroup_cgroup_pressure_percent Kernel-computed PSI average, percent of wall time stalled (0-100), over the labelled window.
+# TYPE namedprocess_namegroup_cgroup_pressure_percent gauge
+namedprocess_namegroup_cgroup_pressure_percent{groupname="nma",kind="some",resource="memory",window="avg60"} 2
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_pressure_percent",
+	); err != nil {
+		t.Error(err)
+	}
+	// avg10 and avg300 must be absent; the counter must be present (total set).
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_pressure_percent"); n != 1 {
+		t.Errorf("expected exactly 1 percent series (avg60 only), got %d", n)
+	}
+	if n := testutil.CollectAndCount(tc,
+		"namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total"); n != 1 {
+		t.Errorf("expected the memory-waiting counter (total in windows), got %d", n)
+	}
+}
+
+// TestCgroupCollectorRootPathSkipped verifies a group resolving to the root
+// cgroup ("/") emits nothing rather than mislabeling host-root metrics.
+func TestCgroupCollectorRootPathSkipped(t *testing.T) {
+	// Fixture has a real unit, but the group points at "/", so the root file
+	// (if any) must never be read/emitted for this group.
+	root := writeFixtureCgroupfs(t, "/runtime.slice/nma.service",
+		"some avg10=1.00 avg60=2.00 avg300=3.00 total=2000000\n")
+
+	tc := newTestCollector(t, root, config.CgroupConfig{}, proc.GroupByName{
+		"rootish": proc.Group{CgroupV2Path: "/"},
+	})
+
+	if n := testutil.CollectAndCount(tc,
+		"namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total"); n != 0 {
+		t.Errorf("expected no series for a group resolving to root cgroup, got %d", n)
 	}
 }
 
