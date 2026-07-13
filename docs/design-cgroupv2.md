@@ -15,9 +15,9 @@ files — alongside the existing `/proc`-derived process metrics. The motivating
 case: on hosts where process groups map 1:1 onto cgroups (systemd units under
 `runtime.slice`, e.g. Bottlerocket), `memory.current`/PSI is the number the
 kernel enforces limits against and that triggers OOM kills, whereas summed
-process RSS only reflects the matched binaries. See the QRT repro-test
-`build-and-deploy.md` "Interpreting the cgroup-vs-RSS delta" section for the
-observed difference in practice.
+process RSS only reflects the matched binaries. (The gap between whole-cgroup
+`memory.current` and summed process RSS is itself a useful diagnostic — page
+cache, kernel memory, and unmatched/child procs charged to the cgroup.)
 
 ## Constraints & principles
 
@@ -66,6 +66,14 @@ observed difference in practice.
   following node_exporter's vocabulary.
 - **Skip-and-count over best-effort attribution.** When procs span cgroups we
   emit nothing rather than pick one, to avoid silently mislabeling.
+- **`memory.swap.current` is its own metric, not a `memory.stat` field.**
+  `-cgroup.memory` also reads `memory.swap.current` and emits
+  `namedprocess_namegroup_cgroup_memory_swap_current_bytes` (the whole-cgroup
+  analog of the per-process `memory_bytes{memtype="swapped"}`). Cgroup swap does
+  *not* live in `memory.stat` — the `swapcached`/`zswap*` stat keys are
+  swap-cached-back-in-RAM, a different quantity — so the `stat_fields` allowlist
+  cannot produce it; it needed a dedicated read. Omitted when swap accounting is
+  disabled (file absent).
 
 ## Code review (2026-07-13)
 
@@ -127,6 +135,7 @@ fork evaluator / upstream reviewer sees them.
 - Unit: `cgroup/*_test.go` (parsing, os.Root confinement/escape),
   `collector/cgroup_collector_test.go`, `config/config_test.go`,
   `proc/grouper_test.go` (conflict tracking).
-- End-to-end: DaemonSet on EKS/Bottlerocket (eu-west-1), plain Prometheus via
-  annotations; all four families confirmed emitting for kubelet/containerd/
-  ipamd/coredns. Deployment manifests + dashboards in the QRT repro-test folder.
+- End-to-end: validated as a DaemonSet on EKS Auto Mode / Bottlerocket, plain
+  Prometheus via annotations; all families confirmed emitting for
+  kubelet/containerd/ipamd/coredns. Ready-to-adapt manifests and the dashboard
+  are in [`docs/examples/`](examples/).

@@ -123,8 +123,8 @@
     },
     {
       "type": "stat",
-      "title": "cgroup scrapes skipped (groups spanning multiple cgroups)",
-      "description": "namedprocess_scrape_cgroup_skipped \u2014 should stay flat at/near 0 with --children=false. A rising value means a group's procs span multiple cgroups and its cgroup metrics are being dropped.",
+      "title": "cgroup scrapes skipped (rate, last 5m)",
+      "description": "Per-scrape count of groups whose cgroup metrics were dropped because their procs span multiple cgroups. This is a CUMULATIVE COUNTER, so it is shown as increase()[5m] (groups skipped in the last 5 min) \u2014 the raw counter only ever grows. A non-zero value is expected for genuinely split groups (e.g. csi-node-driver, whose procs live in different cgroups); a rising rate for other groups means investigate.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -150,11 +150,7 @@
               },
               {
                 "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
+                "value": 0.5
               }
             ]
           },
@@ -182,7 +178,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(namedprocess_scrape_cgroup_skipped{node=~\"$node\"})",
+          "expr": "sum(increase(namedprocess_scrape_cgroup_skipped{node=~\"$node\"}[5m]))",
           "legendFormat": "skipped",
           "refId": "A"
         }
