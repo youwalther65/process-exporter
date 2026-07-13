@@ -398,9 +398,11 @@ process_names:
 
 cgroups:
   psi:
-    # Which PSI values to export. Default: total only (a seconds counter — derive
-    # rates with rate() in PromQL). Add avg10/avg60/avg300 for the kernel's
-    # pre-computed averages (exported as the *_ratio gauge).
+    # Which PSI values to export, as a per-window allowlist. Default when
+    # omitted: total only (a seconds counter — derive rates with rate() in
+    # PromQL). "total" gates the *_seconds_total counters; avg10/avg60/avg300
+    # each add one _pressure_percent gauge series. Only the windows you list are
+    # emitted — e.g. [avg60] emits just avg60 and no counter.
     windows:
     - total
     - avg10
@@ -431,18 +433,21 @@ are encoded in the metric name (`waiting` = PSI *some*, `stalled` = PSI *full*).
 Only the total is exported by default, as a seconds counter.
 
 - `namedprocess_namegroup_cgroup_pressure_cpu_waiting_seconds_total`
+- `namedprocess_namegroup_cgroup_pressure_cpu_stalled_seconds_total` (Linux >= 5.13 only)
 - `namedprocess_namegroup_cgroup_pressure_memory_waiting_seconds_total`
 - `namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total`
 - `namedprocess_namegroup_cgroup_pressure_io_waiting_seconds_total`
 - `namedprocess_namegroup_cgroup_pressure_io_stalled_seconds_total`
 
-There is no `cpu_stalled` metric: the kernel's `cpu.pressure` has no *full* line
-("all tasks stalled" is meaningless for CPU).
+The `cpu_stalled` (PSI *full*) counter is only emitted on Linux >= 5.13, where
+`cpu.pressure` grew a *full* line; on older kernels that line is absent and the
+metric is simply not exported.
 
 When `avg10`/`avg60`/`avg300` are requested via `cgroups.psi.windows`, the
-kernel's pre-computed averages are exported as a gauge:
+kernel's pre-computed averages are exported as a gauge. These are percentages
+(0-100), so the metric is named `_percent` rather than `_ratio`:
 
-- `namedprocess_namegroup_cgroup_pressure_ratio` with labels `resource`
+- `namedprocess_namegroup_cgroup_pressure_percent` with labels `resource`
   (`cpu`/`memory`/`io`), `kind` (`some`/`full`), and `window`
   (`avg10`/`avg60`/`avg300`).
 
