@@ -85,25 +85,6 @@
         "includeAll": false,
         "refresh": 2,
         "current": {}
-      },
-      {
-        "name": "nma",
-        "type": "query",
-        "label": "nma",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "hide": 2,
-        "query": {
-          "query": "label_values(namedprocess_namegroup_memory_bytes{groupname=\"eks-node-monitoring-agent\", groupname=~\"$group\"}, groupname)",
-          "refId": "nma"
-        },
-        "definition": "label_values(namedprocess_namegroup_memory_bytes{groupname=\"eks-node-monitoring-agent\", groupname=~\"$group\"}, groupname)",
-        "multi": false,
-        "includeAll": false,
-        "refresh": 2,
-        "current": {}
       }
     ]
   },
@@ -1812,9 +1793,7 @@
         "x": 0,
         "y": 110
       },
-      "panels": [],
-      "repeat": "nma",
-      "repeatDirection": "h"
+      "panels": []
     },
     {
       "title": "NMA Heap Memory",
