@@ -1170,116 +1170,6 @@
       ]
     },
     {
-      "type": "timeseries",
-      "title": "Node PSI \u2014 waiting (some) & stalled (full), all resources (percent, 5m rate)",
-      "description": "Whole-node PSI from node_exporter across cpu/memory/io. node_exporter only exports the *_seconds_total counters (no kernel avg10 gauge), so this is rate()-derived: fraction of wall-clock time stalled, shown as percent. cpu has no full/stalled line.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 52
-      },
-      "id": 1044,
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
-          },
-          "unit": "percentunit",
-          "min": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": ".*full.*"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    8,
-                    4
-                  ],
-                  "fill": "dash"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avg by (node) (rate(node_pressure_cpu_waiting_seconds_total{node=~\"$node\"}[5m]))",
-          "legendFormat": "{{node}} cpu/some",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avg by (node) (rate(node_pressure_memory_waiting_seconds_total{node=~\"$node\"}[5m]))",
-          "legendFormat": "{{node}} memory/some",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avg by (node) (rate(node_pressure_memory_stalled_seconds_total{node=~\"$node\"}[5m]))",
-          "legendFormat": "{{node}} memory/full",
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avg by (node) (rate(node_pressure_io_waiting_seconds_total{node=~\"$node\"}[5m]))",
-          "legendFormat": "{{node}} io/some",
-          "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "avg by (node) (rate(node_pressure_io_stalled_seconds_total{node=~\"$node\"}[5m]))",
-          "legendFormat": "{{node}} io/full",
-          "refId": "E"
-        }
-      ]
-    },
-    {
       "id": 905,
       "type": "row",
       "title": "Process Memory (process-exporter)",
@@ -1288,7 +1178,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 52
       },
       "panels": []
     },
@@ -1299,7 +1189,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 53
       },
       "id": 1012,
       "datasource": {
@@ -1345,7 +1235,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 53
       },
       "id": 1013,
       "datasource": {
@@ -1391,7 +1281,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 61
       },
       "id": 1014,
       "datasource": {
@@ -1437,7 +1327,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 61
       },
       "id": 1015,
       "datasource": {
@@ -1483,7 +1373,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 77
+        "y": 69
       },
       "id": 1016,
       "datasource": {
@@ -1529,7 +1419,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 77
+        "y": 69
       },
       "id": 1017,
       "datasource": {
@@ -1577,7 +1467,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 85
+        "y": 77
       },
       "datasource": {
         "type": "prometheus",
@@ -1664,7 +1554,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 85
+        "y": 77
       },
       "fieldConfig": {
         "defaults": {
@@ -1735,7 +1625,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 85
       },
       "id": 1020,
       "datasource": {
@@ -1800,7 +1690,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 101
+        "y": 93
       },
       "id": 1021,
       "fieldConfig": {
@@ -1851,7 +1741,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 102
       },
       "panels": []
     },
@@ -1867,7 +1757,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 111
+        "y": 103
       },
       "id": 1022,
       "fieldConfig": {
@@ -1922,7 +1812,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 111
+        "y": 103
       },
       "id": 1023,
       "fieldConfig": {
@@ -2004,7 +1894,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 111
+        "y": 103
       },
       "id": 1024,
       "fieldConfig": {
@@ -2087,7 +1977,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 119
+        "y": 111
       },
       "id": 1025,
       "fieldConfig": {
@@ -2139,7 +2029,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 127
+        "y": 119
       },
       "panels": []
     },
@@ -2150,7 +2040,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 128
+        "y": 120
       },
       "id": 1026,
       "datasource": {
@@ -2220,7 +2110,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 128
+        "y": 120
       },
       "id": 1027,
       "datasource": {
@@ -2290,7 +2180,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 136
+        "y": 128
       },
       "id": 1028,
       "datasource": {
@@ -2325,7 +2215,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 136
+        "y": 128
       },
       "id": 1029,
       "datasource": {
@@ -2376,7 +2266,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 136
+        "y": 128
       },
       "id": 1030,
       "datasource": {
