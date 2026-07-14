@@ -9,7 +9,7 @@ the placeholders for your environment.
 |---|---|
 | `process-exporter-daemonset.yaml` | process-exporter DaemonSet + ConfigMap + headless Service, with the `-cgroup.*` families enabled. The main artifact. |
 | `nma-metrics-proxy-daemonset.yaml` | Optional nginx reverse-proxy exposing the eks-node-monitoring-agent Go-runtime metrics for scraping. Only needed for the dashboard's "NMA Go Runtime" section. |
-| `grafana-dashboard-combined.json` | Grafana dashboard (uid `node-proc-cgroup`): node memory/CPU/pressure, per-process metrics (incl. cgroup-vs-process RSS and swap overlays), and per-cgroup PSI/memory/cpu/pids/swap. The "cgroup scrapes skipped" stat uses `increase()` (it tracks a cumulative counter — a non-zero value is normal for genuinely split groups like csi-node-driver). Import via Dashboards → New → Import → Upload JSON. |
+| `grafana-dashboard-combined.json` | Grafana dashboard (uid `node-proc-cgroup`): node memory/CPU/pressure, node-level PSI (cpu/memory/io from node_exporter's `node_pressure_*`), per-process metrics (incl. cgroup-vs-process RSS and swap overlays), and per-cgroup PSI/memory/cpu/pids/swap. The "cgroup scrapes skipped" stat uses `increase()` (it tracks a cumulative counter — a non-zero value is normal for genuinely split groups like csi-node-driver). Import via Dashboards → New → Import → Upload JSON. |
 
 ## Substitute before applying
 

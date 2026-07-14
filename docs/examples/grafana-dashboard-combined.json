@@ -932,6 +932,354 @@
       }
     },
     {
+      "type": "row",
+      "title": "Node-level Pressure Stall (PSI)",
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 1040,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Node CPU pressure \u2014 waiting (some)",
+      "description": "Whole-node PSI from node_exporter (node_pressure_*). CPU has no 'full' state. Fraction of wall-clock time at least one task was stalled waiting for CPU. Compare against the per-cgroup CPU pressure above to see whether contention is node-wide or group-local.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 44
+      },
+      "id": 1041,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_cpu_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} some",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node Memory pressure \u2014 waiting (some) & stalled (full)",
+      "description": "Whole-node memory PSI from node_exporter. some = any task stalled on memory; full = all non-idle tasks stalled (strong node-wide OOM / thrash signal).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 44
+      },
+      "id": 1042,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*full.*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    8,
+                    4
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_memory_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} some",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_memory_stalled_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} full",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node IO pressure \u2014 waiting (some) & stalled (full)",
+      "description": "Whole-node IO PSI from node_exporter. some = any task stalled on IO; full = all non-idle tasks stalled. Sustained full IO pressure indicates the node's disk/EBS is the bottleneck.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 44
+      },
+      "id": 1043,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*full.*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    8,
+                    4
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_io_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} some",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_io_stalled_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} full",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node PSI \u2014 waiting (some) & stalled (full), all resources (percent, 5m rate)",
+      "description": "Whole-node PSI from node_exporter across cpu/memory/io. node_exporter only exports the *_seconds_total counters (no kernel avg10 gauge), so this is rate()-derived: fraction of wall-clock time stalled, shown as percent. cpu has no full/stalled line.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 1044,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*full.*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    8,
+                    4
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_cpu_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} cpu/some",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_memory_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} memory/some",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_memory_stalled_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} memory/full",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_io_waiting_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} io/some",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (node) (rate(node_pressure_io_stalled_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "{{node}} io/full",
+          "refId": "E"
+        }
+      ]
+    },
+    {
       "id": 905,
       "type": "row",
       "title": "Process Memory (process-exporter)",
@@ -940,7 +1288,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 60
       },
       "panels": []
     },
@@ -951,7 +1299,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 61
       },
       "id": 1012,
       "datasource": {
@@ -997,7 +1345,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 61
       },
       "id": 1013,
       "datasource": {
@@ -1043,7 +1391,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 52
+        "y": 69
       },
       "id": 1014,
       "datasource": {
@@ -1089,7 +1437,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 69
       },
       "id": 1015,
       "datasource": {
@@ -1135,7 +1483,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 77
       },
       "id": 1016,
       "datasource": {
@@ -1181,7 +1529,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 77
       },
       "id": 1017,
       "datasource": {
@@ -1229,7 +1577,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 85
       },
       "datasource": {
         "type": "prometheus",
@@ -1316,7 +1664,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 85
       },
       "fieldConfig": {
         "defaults": {
@@ -1387,7 +1735,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 93
       },
       "id": 1020,
       "datasource": {
@@ -1452,7 +1800,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 101
       },
       "id": 1021,
       "fieldConfig": {
@@ -1503,7 +1851,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 93
+        "y": 110
       },
       "panels": []
     },
@@ -1519,7 +1867,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 94
+        "y": 111
       },
       "id": 1022,
       "fieldConfig": {
@@ -1574,7 +1922,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 94
+        "y": 111
       },
       "id": 1023,
       "fieldConfig": {
@@ -1656,7 +2004,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 94
+        "y": 111
       },
       "id": 1024,
       "fieldConfig": {
@@ -1739,7 +2087,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 102
+        "y": 119
       },
       "id": 1025,
       "fieldConfig": {
@@ -1791,7 +2139,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 127
       },
       "panels": []
     },
@@ -1802,7 +2150,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 111
+        "y": 128
       },
       "id": 1026,
       "datasource": {
@@ -1872,7 +2220,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 111
+        "y": 128
       },
       "id": 1027,
       "datasource": {
@@ -1942,7 +2290,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 119
+        "y": 136
       },
       "id": 1028,
       "datasource": {
@@ -1977,7 +2325,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 119
+        "y": 136
       },
       "id": 1029,
       "datasource": {
@@ -2028,7 +2376,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 119
+        "y": 136
       },
       "id": 1030,
       "datasource": {
