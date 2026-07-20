@@ -401,6 +401,7 @@ Metric *families* are enabled with command-line flags:
 | `-cgroup.memory` | `memory.current` and selected `memory.stat` fields |
 | `-cgroup.cpu` | `cpu.stat` user/system seconds |
 | `-cgroup.pids` | `pids.current` |
+| `-cgroup.io` | `io.stat` per-device bytes and IO operation counts |
 | `-cgroupfs <path>` | cgroup v2 mount point (default `/sys/fs/cgroup`) |
 
 Field-level selection (to bound cardinality) is configured in the same YAML
@@ -491,7 +492,56 @@ rate(namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total{groupna
 
 ### pids metrics (`-cgroup.pids`)
 
+In cgroup v2 the `pids` controller counts every task — threads and processes
+alike — so `pids.max` is the combined process+thread limit; there is no separate
+thread cap at the cgroup level.
+
 - `namedprocess_namegroup_cgroup_pids_current` gauge — `pids.current`.
+- `namedprocess_namegroup_cgroup_pids_max` gauge — `pids.max`, the task limit.
+  Only emitted when a finite limit is set (a cgroup with `pids.max` = `max` emits
+  no series, so a `current / max` saturation ratio is simply absent rather than
+  dividing by a sentinel).
+- `namedprocess_namegroup_cgroup_pids_peak` gauge — `pids.peak`, the highest task
+  count the cgroup has ever held (Linux >= 6.1). Survives a spike even after
+  `pids.current` recedes, so it still shows the peak after a crash.
+- `namedprocess_namegroup_cgroup_pids_events_max_total` counter — the `max` key
+  of `pids.events`: how many times a `fork`/`clone` was rejected because
+  `pids.max` was reached. This is the direct pid/thread-exhaustion signal —
+  `rate()`/`increase()` it to alert on a cgroup hitting its task limit (e.g. a
+  daemon aborting when it can't spawn a thread), independent of whether a scrape
+  happened to catch the peak.
+
+### io metrics (`-cgroup.io`)
+
+From `io.stat`, per block device. The `device` label is the kernel's `MAJ:MIN`
+identifier (e.g. `259:0`); `io.stat` does not carry a device *name*, so join
+node_exporter's `node_disk_info` in PromQL to resolve `259:0` to `nvme0n1`. The
+`iomode` label is `read`/`write`/`discard` (discard is only present on kernels
+that report `dbytes`/`dios`). Both are counters — use `rate()`.
+
+- `namedprocess_namegroup_cgroup_io_bytes_total` counter — bytes transferred
+  (`io.stat` `rbytes`/`wbytes`/`dbytes`), the per-cgroup analog of a device's
+  throughput.
+- `namedprocess_namegroup_cgroup_io_ops_total` counter — IO operations issued
+  (`io.stat` `rios`/`wios`/`dios`), the per-cgroup analog of device IOPS.
+
+Only fields the kernel actually reports are emitted; a cgroup with the io
+controller disabled (no `io.stat`) produces no series. Example — per-cgroup write
+IOPS on the root volume `259:0`:
+
+```
+rate(namedprocess_namegroup_cgroup_io_ops_total{groupname="containerd", device="259:0", iomode="write"}[5m])
+```
+
+To label by disk name, join node_exporter (which shares the same `node` label):
+
+```
+sum by (groupname, device, iomode) (rate(namedprocess_namegroup_cgroup_io_ops_total[5m]))
+* on (node, major, minor) group_left(diskname)
+  label_replace(node_disk_info, "diskname", "$1", "device", "(.*)")
+```
+
+(after splitting `device="MAJ:MIN"` into `major`/`minor` with `label_replace`).
 
 ### scrape metric
 

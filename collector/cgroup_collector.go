@@ -27,6 +27,8 @@ type CgroupCollectorOption struct {
 	CPU bool
 	// Pids enables pids.current.
 	Pids bool
+	// IO enables io.stat (per-device bytes and operation counts).
+	IO bool
 	// Config carries the field allowlists / PSI window selection.
 	Config config.CgroupConfig
 	Debug  bool
@@ -111,6 +113,46 @@ var (
 		"namedprocess_namegroup_cgroup_pids_current",
 		"Number of processes/threads currently in this group's cgroup (pids.current).",
 		[]string{"groupname"}, nil)
+
+	// In cgroup v2 the pids controller counts every task (thread or process),
+	// so pids.max is the combined process+thread limit — there is no separate
+	// thread cap at the cgroup level. pids.peak is the high-water mark, which
+	// survives a fork-bomb / thread-exhaustion event even after the count
+	// recedes (e.g. after an NMA SIGABRT), unlike the instantaneous
+	// pids.current. Omitted when the file is absent (older kernels).
+	pidsMaxDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pids_max",
+		"Task (process+thread) limit for this group's cgroup (pids.max); only emitted when a finite limit is set.",
+		[]string{"groupname"}, nil)
+
+	pidsPeakDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pids_peak",
+		"Highest number of tasks (processes+threads) this group's cgroup has ever held (pids.peak, Linux >= 6.1).",
+		[]string{"groupname"}, nil)
+
+	// pids.events: the "max" key counts how many times a fork/clone in this
+	// cgroup was rejected because pids.max was reached. This is the direct
+	// pid/thread-exhaustion signal — a monotonic counter that records the event
+	// even if the task count has since receded (e.g. after a SIGABRT), unlike
+	// pids.current/peak. rate()/increase() it to alert on exhaustion.
+	pidsEventsMaxDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_pids_events_max_total",
+		"Number of fork/clone failures in this group's cgroup caused by hitting pids.max (pids.events 'max').",
+		[]string{"groupname"}, nil)
+
+	// io.stat counters, per block device (the "MAJ:MIN" device label lets you
+	// isolate a single volume, e.g. the root EBS device). rios/wios/dios are the
+	// operation counts that correspond to device IOPS; rbytes/wbytes/dbytes are
+	// the throughput. iomode is read/write/discard.
+	cgroupIOBytesDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_io_bytes_total",
+		"Bytes transferred to/from each block device by this group's cgroup (io.stat rbytes/wbytes/dbytes), by device and iomode.",
+		[]string{"groupname", "device", "iomode"}, nil)
+
+	cgroupIOOpsDesc = prometheus.NewDesc(
+		"namedprocess_namegroup_cgroup_io_ops_total",
+		"IO operations issued to each block device by this group's cgroup (io.stat rios/wios/dios); the per-cgroup analog of device IOPS, by device and iomode.",
+		[]string{"groupname", "device", "iomode"}, nil)
 )
 
 // cgroupCollector reads cgroupv2 metrics for groups with a resolved single
@@ -122,6 +164,7 @@ type cgroupCollector struct {
 	memory bool
 	cpu    bool
 	pids   bool
+	io     bool
 	// psiWindows is the set of PSI windows to emit, resolved from config.
 	// "total" gates the *_seconds_total counters; "avg10"/"avg60"/"avg300"
 	// each gate one _pressure_percent series. Empty config defaults to
@@ -138,7 +181,7 @@ type cgroupCollector struct {
 // newCgroupCollector opens the cgroupfs root and returns a collector for the
 // enabled families. Returns nil (no error) if no family is enabled.
 func newCgroupCollector(opt CgroupCollectorOption) (*cgroupCollector, error) {
-	if !opt.PSI && !opt.Memory && !opt.CPU && !opt.Pids {
+	if !opt.PSI && !opt.Memory && !opt.CPU && !opt.Pids && !opt.IO {
 		return nil, nil
 	}
 	reader, err := cgroup.NewReader(opt.CgroupFSPath)
@@ -155,6 +198,7 @@ func newCgroupCollector(opt CgroupCollectorOption) (*cgroupCollector, error) {
 		memory:        opt.Memory,
 		cpu:           opt.CPU,
 		pids:          opt.Pids,
+		io:            opt.IO,
 		psiWindows:    resolvePSIWindows(opt.Config.PSIWindows),
 		memStatFields: memStatFields,
 		debug:         opt.Debug,
@@ -202,6 +246,11 @@ func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 	ch <- memoryStatDesc
 	ch <- cgroupCPUDesc
 	ch <- pidsCurrentDesc
+	ch <- pidsMaxDesc
+	ch <- pidsPeakDesc
+	ch <- pidsEventsMaxDesc
+	ch <- cgroupIOBytesDesc
+	ch <- cgroupIOOpsDesc
 }
 
 // collectGroup emits cgroup metrics for a single named group. Per the
@@ -235,6 +284,9 @@ func (c *cgroupCollector) collectGroup(ch chan<- prometheus.Metric, gname string
 	}
 	if c.pids {
 		c.collectPids(ch, gname, group.CgroupV2Path)
+	}
+	if c.io {
+		c.collectIO(ch, gname, group.CgroupV2Path)
 	}
 }
 
@@ -284,14 +336,77 @@ func (c *cgroupCollector) collectCPU(ch chan<- prometheus.Metric, gname, cgroupP
 	}
 }
 
-// collectPids emits pids.current.
+// collectPids emits pids.current plus the exhaustion-related pids.max, pids.peak
+// and pids.events. Each is read independently so a group with only some of the
+// files (e.g. no pids.peak on kernels < 6.1, or no pids.max on the root cgroup)
+// still emits whatever is present.
 func (c *cgroupCollector) collectPids(ch chan<- prometheus.Metric, gname, cgroupPath string) {
-	cur, err := c.reader.ReadUint64(cgroupPath, "pids.current")
-	if err != nil {
+	if cur, err := c.reader.ReadUint64(cgroupPath, "pids.current"); err != nil {
 		c.debugf("group %q: reading pids.current: %v", gname, err)
+	} else {
+		ch <- prometheus.MustNewConstMetric(pidsCurrentDesc, prometheus.GaugeValue, float64(cur), gname)
+	}
+
+	// pids.max holds "max" (unlimited) on cgroups with no configured limit; in
+	// that case emit no series so a saturation ratio (current/max) is simply
+	// absent rather than dividing by a sentinel.
+	if limit, limited, err := c.reader.ReadPidsMax(cgroupPath); err != nil {
+		c.debugf("group %q: reading pids.max: %v", gname, err)
+	} else if limited {
+		ch <- prometheus.MustNewConstMetric(pidsMaxDesc, prometheus.GaugeValue, float64(limit), gname)
+	}
+
+	if peak, err := c.reader.ReadUint64(cgroupPath, "pids.peak"); err != nil {
+		c.debugf("group %q: reading pids.peak: %v", gname, err)
+	} else {
+		ch <- prometheus.MustNewConstMetric(pidsPeakDesc, prometheus.GaugeValue, float64(peak), gname)
+	}
+
+	if events, err := c.reader.ReadKeyed(cgroupPath, "pids.events"); err != nil {
+		c.debugf("group %q: reading pids.events: %v", gname, err)
+	} else if v, ok := events["max"]; ok {
+		ch <- prometheus.MustNewConstMetric(pidsEventsMaxDesc, prometheus.CounterValue, float64(v), gname)
+	}
+}
+
+// ioStatFields maps io.stat's per-device counter keys to the (descriptor,
+// iomode label) they're emitted under. Bytes and ops are separate metrics so
+// each keeps consistent units; the read/write/discard direction is a label.
+// Keys absent on a given kernel (dbytes/dios predate some kernels, or are 0 and
+// omitted) simply produce no series.
+var ioStatFields = []struct {
+	key    string
+	desc   *prometheus.Desc
+	iomode string
+}{
+	{"rbytes", cgroupIOBytesDesc, "read"},
+	{"wbytes", cgroupIOBytesDesc, "write"},
+	{"dbytes", cgroupIOBytesDesc, "discard"},
+	{"rios", cgroupIOOpsDesc, "read"},
+	{"wios", cgroupIOOpsDesc, "write"},
+	{"dios", cgroupIOOpsDesc, "discard"},
+}
+
+// collectIO emits per-device io.stat bytes and operation counts. The device
+// ("MAJ:MIN") is a label so a single volume (e.g. the root EBS device) can be
+// isolated; rate() over the *_io_ops_total series gives per-cgroup IOPS.
+func (c *cgroupCollector) collectIO(ch chan<- prometheus.Metric, gname, cgroupPath string) {
+	// io.stat is absent when the io controller isn't enabled for the cgroup; a
+	// read error is skipped like any other missing file so we degrade gracefully.
+	devices, err := c.reader.ReadIOStat(cgroupPath)
+	if err != nil {
+		c.debugf("group %q: reading io.stat: %v", gname, err)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(pidsCurrentDesc, prometheus.GaugeValue, float64(cur), gname)
+	for dev, counters := range devices {
+		for _, f := range ioStatFields {
+			// Only emit fields actually present, so a counter the kernel omits
+			// produces no series rather than a spurious zero.
+			if v, ok := counters[f.key]; ok {
+				ch <- prometheus.MustNewConstMetric(f.desc, prometheus.CounterValue, float64(v), gname, dev, f.iomode)
+			}
+		}
+	}
 }
 
 func (c *cgroupCollector) debugf(format string, args ...interface{}) {

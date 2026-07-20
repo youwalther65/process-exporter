@@ -83,3 +83,22 @@ func (r *Reader) ReadKeyed(cgroupPath, name string) (map[string]uint64, error) {
 	return ParseKeyed(content)
 }
 
+// ReadPidsMax reads and parses pids.max under the given cgroup path, returning
+// the limit and whether a finite limit is set ("max" => not limited).
+func (r *Reader) ReadPidsMax(cgroupPath string) (limit uint64, limited bool, err error) {
+	content, err := r.readFile(cgroupPath, "pids.max")
+	if err != nil {
+		return 0, false, err
+	}
+	return ParsePidsMax(content)
+}
+
+// ReadIOStat reads and parses io.stat (per-device "MAJ:MIN key=value ..." lines)
+// under the given cgroup path.
+func (r *Reader) ReadIOStat(cgroupPath string) (map[string]map[string]uint64, error) {
+	content, err := r.readFile(cgroupPath, "io.stat")
+	if err != nil {
+		return nil, err
+	}
+	return ParseIOStat(content)
+}
