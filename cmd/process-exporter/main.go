@@ -194,6 +194,8 @@ func main() {
 			"export cgroupv2 cpu.stat (user/system seconds) per group")
 		cgroupPids = flag.Bool("cgroup.pids", false,
 			"export cgroupv2 pids.current per group")
+		cgroupIO = flag.Bool("cgroup.io", false,
+			"export cgroupv2 io.stat (per-device bytes and IO operation counts) per group")
 	)
 	flag.Parse()
 
@@ -267,13 +269,14 @@ func main() {
 	// Enable cgroupv2 collection only if at least one -cgroup.* family is set.
 	// When nil, the exporter behaves exactly as it did before.
 	var cgroupOption *collector.CgroupCollectorOption
-	if *cgroupPSI || *cgroupMemory || *cgroupCPU || *cgroupPids {
+	if *cgroupPSI || *cgroupMemory || *cgroupCPU || *cgroupPids || *cgroupIO {
 		cgroupOption = &collector.CgroupCollectorOption{
 			CgroupFSPath: *cgroupfsPath,
 			PSI:          *cgroupPSI,
 			Memory:       *cgroupMemory,
 			CPU:          *cgroupCPU,
 			Pids:         *cgroupPids,
+			IO:           *cgroupIO,
 			Config:       cgroupConfig,
 			Debug:        *debug,
 		}

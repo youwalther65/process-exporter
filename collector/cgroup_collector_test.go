@@ -204,8 +204,8 @@ func TestNewCgroupCollectorDisabled(t *testing.T) {
 	}
 }
 
-// writeStatFixture writes memory.current, memory.stat, cpu.stat and
-// pids.current for one unit and returns the cgroupfs root.
+// writeStatFixture writes memory.current, memory.stat, cpu.stat, pids.current
+// and io.stat for one unit and returns the cgroupfs root.
 func writeStatFixture(t *testing.T, cgroupPath string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -219,6 +219,11 @@ func writeStatFixture(t *testing.T, cgroupPath string) string {
 		"memory.stat":         "anon 1048576\nfile 2097152\nkernel 524288\nslab 262144\nsock 131072\nunused_field 999\n",
 		"cpu.stat":            "usage_usec 9000000\nuser_usec 6000000\nsystem_usec 3000000\nnr_periods 0\n",
 		"pids.current":        "17\n",
+		"pids.max":            "4096\n",
+		"pids.peak":           "512\n",
+		"pids.events":         "max 7\n",
+		// One device with the full modern field set (incl. discard).
+		"io.stat": "259:0 rbytes=1048576 wbytes=2097152 rios=100 wios=200 dbytes=4096 dios=3\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(unit, name), []byte(content), 0o644); err != nil {
@@ -319,6 +324,132 @@ namedprocess_namegroup_cgroup_pids_current{groupname="nma"} 17
 		"namedprocess_namegroup_cgroup_pids_current",
 	); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestCgroupCollectorIO(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, IO: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	// io.stat: device 259:0, bytes and ops split by iomode (read/write/discard).
+	const want = `
+# HELP namedprocess_namegroup_cgroup_io_bytes_total Bytes transferred to/from each block device by this group's cgroup (io.stat rbytes/wbytes/dbytes), by device and iomode.
+# TYPE namedprocess_namegroup_cgroup_io_bytes_total counter
+namedprocess_namegroup_cgroup_io_bytes_total{device="259:0",groupname="nma",iomode="discard"} 4096
+namedprocess_namegroup_cgroup_io_bytes_total{device="259:0",groupname="nma",iomode="read"} 1.048576e+06
+namedprocess_namegroup_cgroup_io_bytes_total{device="259:0",groupname="nma",iomode="write"} 2.097152e+06
+# HELP namedprocess_namegroup_cgroup_io_ops_total IO operations issued to each block device by this group's cgroup (io.stat rios/wios/dios); the per-cgroup analog of device IOPS, by device and iomode.
+# TYPE namedprocess_namegroup_cgroup_io_ops_total counter
+namedprocess_namegroup_cgroup_io_ops_total{device="259:0",groupname="nma",iomode="discard"} 3
+namedprocess_namegroup_cgroup_io_ops_total{device="259:0",groupname="nma",iomode="read"} 100
+namedprocess_namegroup_cgroup_io_ops_total{device="259:0",groupname="nma",iomode="write"} 200
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_io_bytes_total",
+		"namedprocess_namegroup_cgroup_io_ops_total",
+	); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestCgroupCollectorIOAbsent verifies io.stat being missing (io controller not
+// enabled) produces no series and no panic, rather than a spurious zero.
+func TestCgroupCollectorIOAbsent(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	// Fixture with memory.current but no io.stat.
+	root := t.TempDir()
+	unit := filepath.Join(root, strings.Trim(path, "/"))
+	if err := os.MkdirAll(unit, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(unit, "memory.current"), []byte("104857600\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, IO: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_io_bytes_total"); n != 0 {
+		t.Errorf("expected no io bytes series when io.stat absent, got %d", n)
+	}
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_io_ops_total"); n != 0 {
+		t.Errorf("expected no io ops series when io.stat absent, got %d", n)
+	}
+}
+
+// TestCgroupCollectorPidsExhaustion verifies the pid/thread-exhaustion signals:
+// pids.max (limit), pids.peak (high-water mark) and pids.events "max" (the
+// fork-rejected counter). These are what identify an NMA-style SIGABRT from
+// hitting the task limit even after pids.current recedes.
+func TestCgroupCollectorPidsExhaustion(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, Pids: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	const want = `
+# HELP namedprocess_namegroup_cgroup_pids_max Task (process+thread) limit for this group's cgroup (pids.max); only emitted when a finite limit is set.
+# TYPE namedprocess_namegroup_cgroup_pids_max gauge
+namedprocess_namegroup_cgroup_pids_max{groupname="nma"} 4096
+# HELP namedprocess_namegroup_cgroup_pids_peak Highest number of tasks (processes+threads) this group's cgroup has ever held (pids.peak, Linux >= 6.1).
+# TYPE namedprocess_namegroup_cgroup_pids_peak gauge
+namedprocess_namegroup_cgroup_pids_peak{groupname="nma"} 512
+# HELP namedprocess_namegroup_cgroup_pids_events_max_total Number of fork/clone failures in this group's cgroup caused by hitting pids.max (pids.events 'max').
+# TYPE namedprocess_namegroup_cgroup_pids_events_max_total counter
+namedprocess_namegroup_cgroup_pids_events_max_total{groupname="nma"} 7
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_pids_max",
+		"namedprocess_namegroup_cgroup_pids_peak",
+		"namedprocess_namegroup_cgroup_pids_events_max_total",
+	); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestCgroupCollectorPidsMaxUnlimited verifies pids.max = "max" emits no limit
+// series (so a current/max saturation ratio is simply absent, not a divide-by-
+// sentinel), while pids.current is still emitted.
+func TestCgroupCollectorPidsMaxUnlimited(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := t.TempDir()
+	unit := filepath.Join(root, strings.Trim(path, "/"))
+	if err := os.MkdirAll(unit, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"pids.current": "3\n",
+		"pids.max":     "max\n",
+	} {
+		if err := os.WriteFile(filepath.Join(unit, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, Pids: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_pids_max"); n != 0 {
+		t.Errorf("expected no pids.max series when unlimited, got %d", n)
+	}
+	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_pids_current"); n != 1 {
+		t.Errorf("expected pids.current still emitted, got %d", n)
 	}
 }
 
