@@ -605,6 +605,31 @@ docker buildx build \
 docker buildx imagetools inspect "${REGISTRY}/${REPO}:${TAG}"
 ```
 
+#### Scanning the image
+
+This is a `FROM scratch` image holding a single static Go binary, so there is no
+OS package database to scan — the meaningful check is Trivy's Go-binary scanner,
+which reads the versions embedded in the binary (the same build metadata as
+`go version -m`) and matches them against its vulnerability database. Scan the
+pushed image by tag (or, better, the pinned digest) — Trivy uses the Docker
+credential chain, so a prior `docker login` to the registry is enough:
+
+```bash
+# Fixable HIGH/CRITICAL only; non-zero exit so it can gate a build/CI step.
+trivy image \
+  --scanners vuln \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --exit-code 1 \
+  "${REGISTRY}/${REPO}:${TAG}"
+```
+
+Findings are almost always Go stdlib / module CVEs; the remediation lever is the
+Go toolchain version in the `Dockerfile` and dependency bumps in `go.mod`, not OS
+patching. You can catch those before an image even exists by scanning the source
+tree (`trivy fs --scanners vuln go.mod`), and emit an SBOM alongside the scan with
+`trivy image --format cyclonedx -o process-exporter.cdx.json "${REGISTRY}/${REPO}:${TAG}"`.
+
 Set the resulting image in your deployment (see the DaemonSet in
 [`docs/examples/`](docs/examples/), which pins the image and enables the
 `-cgroup.*` families). Because that manifest pins by digest, redeploys use the
