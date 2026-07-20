@@ -2330,6 +2330,334 @@
           }
         }
       ]
+    },
+    {
+      "type": "row",
+      "id": 908,
+      "title": "Block IO (io.stat)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 137,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 1044,
+      "title": "IO operations rate (io.stat rios/wios) by group & device",
+      "description": "Per-cgroup IOPS: rate of io_ops_total split by iomode. device is MAJ:MIN, resolved to the kernel disk name via node_disk_info (e.g. nvme0n1 = root EBS). This is the per-cgroup analog of EBS VolumeReadOps/VolumeWriteOps.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 138,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "iops",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "label_replace(label_replace(sum by (node, groupname, device, iomode) (rate(namedprocess_namegroup_cgroup_io_ops_total{node=~\"$node\", groupname=~\"$group\", iomode=~\"read|write\"}[5m])), \"major\", \"$1\", \"device\", \"([0-9]+):([0-9]+)\"), \"minor\", \"$2\", \"device\", \"([0-9]+):([0-9]+)\")\n* on (node, major, minor) group_left(diskname)\nlabel_replace(node_disk_info{node=~\"$node\"}, \"diskname\", \"$1\", \"device\", \"(.*)\")",
+          "legendFormat": "{{groupname}} \u00b7 {{diskname}} ({{device}}) {{iomode}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 1045,
+      "title": "IO throughput rate (io.stat rbytes/wbytes) by group & device",
+      "description": "Per-cgroup disk throughput: rate of io_bytes_total split by iomode. device MAJ:MIN resolved to kernel disk name via node_disk_info. Analog of EBS VolumeReadBytes/VolumeWriteBytes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 138,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "Bps",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "label_replace(label_replace(sum by (node, groupname, device, iomode) (rate(namedprocess_namegroup_cgroup_io_bytes_total{node=~\"$node\", groupname=~\"$group\", iomode=~\"read|write\"}[5m])), \"major\", \"$1\", \"device\", \"([0-9]+):([0-9]+)\"), \"minor\", \"$2\", \"device\", \"([0-9]+):([0-9]+)\")\n* on (node, major, minor) group_left(diskname)\nlabel_replace(node_disk_info{node=~\"$node\"}, \"diskname\", \"$1\", \"device\", \"(.*)\")",
+          "legendFormat": "{{groupname}} \u00b7 {{diskname}} ({{device}}) {{iomode}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "id": 909,
+      "title": "PID / thread exhaustion",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 147,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 1046,
+      "title": "PID/thread exhaustion events (pids.events max)",
+      "description": "rate of fork/clone rejections caused by hitting pids.max. Non-zero = the cgroup ran out of its task (process+thread) allotment \u2014 the NMA SIGABRT signature.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 148,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (rate(namedprocess_namegroup_cgroup_pids_events_max_total{node=~\"$node\", groupname=~\"$group\"}[5m]))",
+          "legendFormat": "{{groupname}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 1047,
+      "title": "Task saturation \u2014 current & peak vs limit (pids.current/peak \u00f7 pids.max)",
+      "description": "How close each cgroup is to its pids.max task limit. peak/max surviving near 1.0 after an incident is the fingerprint of a limit-hit crash.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 148,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "percentunit",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "namedprocess_namegroup_cgroup_pids_current{node=~\"$node\", groupname=~\"$group\"} / namedprocess_namegroup_cgroup_pids_max{node=~\"$node\", groupname=~\"$group\"}",
+          "legendFormat": "{{groupname}} current",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "namedprocess_namegroup_cgroup_pids_peak{node=~\"$node\", groupname=~\"$group\"} / namedprocess_namegroup_cgroup_pids_max{node=~\"$node\", groupname=~\"$group\"}",
+          "legendFormat": "{{groupname}} peak",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "id": 1048,
+      "title": "Tasks: current / peak / limit (pids.current/peak/max)",
+      "description": "Absolute task counts and the limit per cgroup. peak is the high-water mark and survives after current recedes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 148,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "namedprocess_namegroup_cgroup_pids_current{node=~\"$node\", groupname=~\"$group\"}",
+          "legendFormat": "{{groupname}} current",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "namedprocess_namegroup_cgroup_pids_peak{node=~\"$node\", groupname=~\"$group\"}",
+          "legendFormat": "{{groupname}} peak",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "namedprocess_namegroup_cgroup_pids_max{node=~\"$node\", groupname=~\"$group\"}",
+          "legendFormat": "{{groupname}} max",
+          "refId": "C"
+        }
+      ]
     }
   ]
 }
