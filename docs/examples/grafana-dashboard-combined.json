@@ -1,98 +1,6 @@
 {
-  "uid": "node-proc-cgroup",
-  "title": "Node Memory, CPU & Pressure (cgroup v2)",
-  "tags": [
-    "process-exporter",
-    "cgroup-v2"
-  ],
-  "timezone": "",
-  "schemaVersion": 39,
-  "version": 0,
-  "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "templating": {
-    "list": [
-      {
-        "name": "DS_PROMETHEUS",
-        "type": "datasource",
-        "query": "prometheus",
-        "hide": 0,
-        "refresh": 1,
-        "current": {}
-      },
-      {
-        "name": "node",
-        "type": "query",
-        "label": "Node",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": {
-          "query": "label_values(node_memory_MemTotal_bytes, node)",
-          "refId": "n"
-        },
-        "definition": "label_values(node_memory_MemTotal_bytes, node)",
-        "multi": false,
-        "includeAll": false,
-        "refresh": 2,
-        "sort": 1,
-        "current": {}
-      },
-      {
-        "name": "group",
-        "type": "query",
-        "label": "Group",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": {
-          "query": "label_values(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\"}, groupname)",
-          "refId": "g"
-        },
-        "definition": "label_values(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\"}, groupname)",
-        "multi": true,
-        "includeAll": true,
-        "refresh": 2,
-        "sort": 1,
-        "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        }
-      },
-      {
-        "name": "instance_type",
-        "type": "query",
-        "label": "Instance Type",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": {
-          "query": "label_values(kube_node_labels{node=~\"$node\"}, label_node_kubernetes_io_instance_type)",
-          "refId": "it"
-        },
-        "definition": "label_values(kube_node_labels{node=~\"$node\"}, label_node_kubernetes_io_instance_type)",
-        "multi": false,
-        "includeAll": false,
-        "refresh": 2,
-        "current": {}
-      }
-    ]
-  },
   "panels": [
     {
-      "id": 903,
-      "type": "row",
-      "title": "Overview (cgroup)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -100,23 +8,17 @@
         "x": 0,
         "y": 0
       },
-      "panels": []
+      "id": 903,
+      "panels": [],
+      "title": "Overview (cgroup)",
+      "type": "row"
     },
     {
-      "type": "stat",
-      "title": "cgroup scrapes skipped (rate, last 5m)",
-      "description": "Per-scrape count of groups whose cgroup metrics were dropped because their procs span multiple cgroups. This is a CUMULATIVE COUNTER, so it is shown as increase()[5m] (groups skipped in the last 5 min) \u2014 the raw counter only ever grows. A non-zero value is expected for genuinely split groups (e.g. csi-node-driver, whose procs live in different cgroups); a rising rate for other groups means investigate.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1008,
+      "description": "Per-scrape count of groups whose cgroup metrics were dropped because their procs span multiple cgroups. This is a CUMULATIVE COUNTER, so it is shown as increase()[5m] (groups skipped in the last 5 min) — the raw counter only ever grows. A non-zero value is expected for genuinely split groups (e.g. csi-node-driver, whose procs live in different cgroups); a rising rate for other groups means investigate.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -139,6 +41,13 @@
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1008,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
@@ -163,14 +72,26 @@
           "legendFormat": "skipped",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "cgroup scrapes skipped (rate, last 5m)",
+      "type": "stat"
     },
     {
-      "type": "timeseries",
-      "title": "Processes/threads (pids.current) by group",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -179,18 +100,6 @@
         "y": 1
       },
       "id": 1009,
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "calcs": [
@@ -216,12 +125,11 @@
           "legendFormat": "{{groupname}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Processes/threads (pids.current) by group",
+      "type": "timeseries"
     },
     {
-      "id": 904,
-      "type": "row",
-      "title": "CPU Overview",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -229,15 +137,29 @@
         "x": 0,
         "y": 9
       },
-      "panels": []
+      "id": 904,
+      "panels": [],
+      "title": "CPU Overview",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "CPU usage rate (cpu.stat) by group",
-      "description": "rate of cpu_seconds_total across user+system, in cores.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "rate of cpu_seconds_total across user+system, in cores.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "decimals": 3,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -246,19 +168,6 @@
         "y": 10
       },
       "id": 1010,
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
-          },
-          "unit": "short",
-          "decimals": 3
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "calcs": [
@@ -284,14 +193,30 @@
           "legendFormat": "{{groupname}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "CPU usage rate (cpu.stat) by group",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "CPU usage rate by mode (user/system) \u2014 sum of selected groups",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "decimals": 3,
+          "unit": "short"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -300,22 +225,6 @@
         "y": 10
       },
       "id": 1011,
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "showPoints": "never",
-            "lineWidth": 1,
-            "stacking": {
-              "mode": "normal"
-            }
-          },
-          "unit": "short",
-          "decimals": 3
-        },
-        "overrides": []
-      },
       "options": {
         "legend": {
           "calcs": [
@@ -341,12 +250,11 @@
           "legendFormat": "{{mode}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "CPU usage rate by mode (user/system) — sum of selected groups",
+      "type": "timeseries"
     },
     {
-      "id": 900,
-      "type": "row",
-      "title": "Memory Overview",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -354,30 +262,351 @@
         "x": 0,
         "y": 18
       },
-      "panels": []
+      "id": 910,
+      "panels": [],
+      "title": "Node CPU by Mode (node_exporter)",
+      "type": "row"
     },
     {
-      "title": "Memory Usage Overview",
-      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "Per-mode node CPU from node_cpu_seconds_total (all cores summed), idle excluded. High softirq=network/NFS soft interrupts; high iowait=blocked on EFS/NFS I/O; high system=kernel syscalls. Pods doing 'echo hi' show ~0 user while these burn CPU.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "decimals": 3,
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
         "y": 19
       },
-      "id": 1000,
+      "id": 1049,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (mode) (rate(node_cpu_seconds_total{node=~\"$node\", mode!=\"idle\"}[5m]))",
+          "legendFormat": "{{mode}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Node CPU by mode (cores, stacked) — softirq/iowait/system/irq",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "Fraction (0-1) of total node CPU. 'kernel-side'=system+softirq+irq+iowait. When kernel-side is high while user stays near 0, the CPU burn is NOT the workload's code (e.g. EFS/NFS I/O + network softirq), it's the kernel. Signature of the 2026-07-20 i-0c916897dd76c242b 'node is dead' event.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "decimals": 3,
+          "max": 1,
+          "min": 0,
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "kernel-side (system+softirq+irq+iowait)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 1050,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(node_cpu_seconds_total{node=~\"$node\", mode=~\"system|softirq|irq|iowait\"}[5m])) / sum(rate(node_cpu_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "kernel-side (system+softirq+irq+iowait)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(node_cpu_seconds_total{node=~\"$node\", mode=\"user\"}[5m])) / sum(rate(node_cpu_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "user",
+          "refId": "B"
+        }
+      ],
+      "title": "Node CPU: user vs kernel-side fraction — divergence = not the workload",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "iowait fraction=CPU blocked on I/O (EFS/NFS reads/writes). softirq fraction=soft interrupts (network RX/TX, RPC completion, TLS via efs-proxy). Sustained >0.5 combined = alert threshold. Pair with node_mountstats_* to attribute to a specific EFS filesystem.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "decimals": 3,
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.3
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 1051,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(node_cpu_seconds_total{node=~\"$node\", mode=\"iowait\"}[5m])) / sum(rate(node_cpu_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "iowait",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(node_cpu_seconds_total{node=~\"$node\", mode=\"softirq\"}[5m])) / sum(rate(node_cpu_seconds_total{node=~\"$node\"}[5m]))",
+          "legendFormat": "softirq",
+          "refId": "B"
+        }
+      ],
+      "title": "Node CPU: iowait & softirq fraction (EFS/NFS I/O + network) — alert signal",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "node_context_switches_total and node_intr_total rates. Spikes here alongside softirq/iowait confirm high I/O + network interrupt churn (many short-lived pods hammering EFS mounts) rather than a single CPU-bound process.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "decimals": 0,
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 1052,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "rate(node_context_switches_total{node=~\"$node\"}[5m])",
+          "legendFormat": "context switches/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "rate(node_intr_total{node=~\"$node\"}[5m])",
+          "legendFormat": "interrupts/s",
+          "refId": "B"
+        }
+      ],
+      "title": "Node context switches & interrupts (rate/s) — churn corroboration",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 900,
+      "panels": [],
+      "title": "Memory Overview",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": [
           {
@@ -389,11 +618,11 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "fill": "dash",
                   "dash": [
                     10,
                     10
-                  ]
+                  ],
+                  "fill": "dash"
                 }
               },
               {
@@ -404,71 +633,70 @@
           }
         ]
       },
-      "targets": [
-        {
-          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"}",
-          "legendFormat": "Total",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"} - node_memory_MemAvailable_bytes{node=~\"$node\"}",
-          "legendFormat": "Used",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_MemAvailable_bytes{node=~\"$node\"}",
-          "legendFormat": "Available",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_Cached_bytes{node=~\"$node\"} + node_memory_Buffers_bytes{node=~\"$node\"}",
-          "legendFormat": "Cache + Buffers",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 1000,
       "options": {
         "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
           "calcs": [
             "mean",
             "max"
-          ]
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
-      }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"}",
+          "legendFormat": "Total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"} - node_memory_MemAvailable_bytes{node=~\"$node\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemAvailable_bytes{node=~\"$node\"}",
+          "legendFormat": "Available"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_Cached_bytes{node=~\"$node\"} + node_memory_Buffers_bytes{node=~\"$node\"}",
+          "legendFormat": "Cache + Buffers"
+        }
+      ],
+      "title": "Memory Usage Overview",
+      "type": "timeseries"
     },
     {
-      "title": "Memory Available (% of Total)",
-      "type": "gauge",
-      "gridPos": {
-        "h": 8,
-        "w": 4,
-        "x": 12,
-        "y": 19
-      },
-      "id": 1001,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "min": 0,
           "max": 1,
+          "min": 0,
           "thresholds": {
             "steps": [
               {
@@ -488,371 +716,371 @@
                 "value": 0.4
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         }
       },
-      "targets": [
-        {
-          "expr": "node_memory_MemAvailable_bytes{node=~\"$node\"} / node_memory_MemTotal_bytes{node=~\"$node\"}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ]
-    },
-    {
-      "title": "Memory Components",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 19
-      },
-      "id": 1002,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "fillOpacity": 30,
-            "lineWidth": 1,
-            "stacking": {
-              "mode": "normal"
-            },
-            "spanNulls": true
-          }
-        }
-      },
-      "targets": [
-        {
-          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"} - node_memory_MemFree_bytes{node=~\"$node\"} - node_memory_Cached_bytes{node=~\"$node\"} - node_memory_Buffers_bytes{node=~\"$node\"} - node_memory_SReclaimable_bytes{node=~\"$node\"}",
-          "legendFormat": "Used (non-cache)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_Cached_bytes{node=~\"$node\"} + node_memory_Buffers_bytes{node=~\"$node\"}",
-          "legendFormat": "Cache + Buffers",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_SReclaimable_bytes{node=~\"$node\"}",
-          "legendFormat": "SReclaimable",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_Shmem_bytes{node=~\"$node\"}",
-          "legendFormat": "Shmem (non-reclaimable)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_MemFree_bytes{node=~\"$node\"}",
-          "legendFormat": "Free",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": 901,
-      "type": "row",
-      "title": "Swap",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
-      "panels": []
-    },
-    {
-      "title": "Swap Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 28
-      },
-      "id": 1003,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "expr": "node_memory_SwapTotal_bytes{node=~\"$node\"}",
-          "legendFormat": "Total",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_SwapTotal_bytes{node=~\"$node\"} - node_memory_SwapFree_bytes{node=~\"$node\"}",
-          "legendFormat": "Used",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_memory_SwapFree_bytes{node=~\"$node\"}",
-          "legendFormat": "Free",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "Swap I/O Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 28
-      },
-      "id": 1004,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps",
-          "custom": {
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(node_vmstat_pswpin{node=~\"$node\"}[5m]) * 4096",
-          "legendFormat": "Swap In",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "rate(node_vmstat_pswpout{node=~\"$node\"}[5m]) * 4096",
-          "legendFormat": "Swap Out",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": 902,
-      "type": "row",
-      "title": "/tmp Filesystem",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 35
-      },
-      "panels": []
-    },
-    {
-      "title": "/tmp Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 36
-      },
-      "id": 1005,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "custom": {
-            "fillOpacity": 20,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "expr": "node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
-          "legendFormat": "Total",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"} - node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
-          "legendFormat": "Used",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
-          "legendFormat": "Available",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "/tmp Usage %",
-      "type": "gauge",
-      "gridPos": {
-        "h": 7,
         "w": 4,
         "x": 12,
         "y": 36
       },
-      "id": 1006,
+      "id": 1001,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemAvailable_bytes{node=~\"$node\"} / node_memory_MemTotal_bytes{node=~\"$node\"}"
+        }
+      ],
+      "title": "Memory Available (% of Total)",
+      "type": "gauge"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "min": 0,
+          "custom": {
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 36
+      },
+      "id": 1002,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemTotal_bytes{node=~\"$node\"} - node_memory_MemFree_bytes{node=~\"$node\"} - node_memory_Cached_bytes{node=~\"$node\"} - node_memory_Buffers_bytes{node=~\"$node\"} - node_memory_SReclaimable_bytes{node=~\"$node\"}",
+          "legendFormat": "Used (non-cache)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_Cached_bytes{node=~\"$node\"} + node_memory_Buffers_bytes{node=~\"$node\"}",
+          "legendFormat": "Cache + Buffers"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_SReclaimable_bytes{node=~\"$node\"}",
+          "legendFormat": "SReclaimable"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_Shmem_bytes{node=~\"$node\"}",
+          "legendFormat": "Shmem (non-reclaimable)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_MemFree_bytes{node=~\"$node\"}",
+          "legendFormat": "Free"
+        }
+      ],
+      "title": "Memory Components",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 901,
+      "panels": [],
+      "title": "Swap",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "id": 1003,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_SwapTotal_bytes{node=~\"$node\"}",
+          "legendFormat": "Total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_SwapTotal_bytes{node=~\"$node\"} - node_memory_SwapFree_bytes{node=~\"$node\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_memory_SwapFree_bytes{node=~\"$node\"}",
+          "legendFormat": "Free"
+        }
+      ],
+      "title": "Swap Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "id": 1004,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "rate(node_vmstat_pswpin{node=~\"$node\"}[5m]) * 4096",
+          "legendFormat": "Swap In"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "rate(node_vmstat_pswpout{node=~\"$node\"}[5m]) * 4096",
+          "legendFormat": "Swap Out"
+        }
+      ],
+      "title": "Swap I/O Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 902,
+      "panels": [],
+      "title": "/tmp Filesystem",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "id": 1005,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
+          "legendFormat": "Total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"} - node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
+          "legendFormat": "Used"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"}",
+          "legendFormat": "Available"
+        }
+      ],
+      "title": "/tmp Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
           "max": 1,
+          "min": 0,
           "thresholds": {
             "steps": [
               {
@@ -872,68 +1100,76 @@
                 "value": 0.9
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         }
       },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 12,
+        "y": 53
+      },
+      "id": 1006,
       "targets": [
         {
-          "expr": "1 - (node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"} / node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "1 - (node_filesystem_avail_bytes{node=~\"$node\", mountpoint=\"/tmp\"} / node_filesystem_size_bytes{node=~\"$node\", mountpoint=\"/tmp\"})"
         }
-      ]
+      ],
+      "title": "/tmp Usage %",
+      "type": "gauge"
     },
     {
-      "title": "Shmem (backs tmpfs)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 36
-      },
-      "id": 1007,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 20,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "id": 1007,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
       },
       "targets": [
         {
-          "expr": "node_memory_Shmem_bytes{node=~\"$node\"}",
-          "legendFormat": "Shmem",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "node_memory_Shmem_bytes{node=~\"$node\"}",
+          "legendFormat": "Shmem"
         }
       ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
+      "title": "Shmem (backs tmpfs)",
+      "type": "timeseries"
     },
     {
-      "type": "row",
-      "title": "Node-level Pressure Stall (PSI)",
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
@@ -943,39 +1179,39 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 60
       },
       "id": 1040,
-      "panels": []
+      "panels": [],
+      "title": "Node-level Pressure Stall (PSI)",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "Node CPU pressure \u2014 waiting (some)",
-      "description": "Whole-node PSI from node_exporter (node_pressure_*). CPU has no 'full' state. Fraction of wall-clock time at least one task was stalled waiting for CPU. Compare against the per-cgroup CPU pressure above to see whether contention is node-wide or group-local.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 44
-      },
-      "id": 1041,
+      "description": "Whole-node PSI from node_exporter (node_pressure_*). CPU has no 'full' state. Fraction of wall-clock time at least one task was stalled waiting for CPU. Compare against the per-cgroup CPU pressure above to see whether contention is node-wide or group-local.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 61
+      },
+      "id": 1041,
       "options": {
         "legend": {
           "calcs": [
@@ -1001,33 +1237,26 @@
           "legendFormat": "{{node}} some",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Node CPU pressure — waiting (some)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Node Memory pressure \u2014 waiting (some) & stalled (full)",
-      "description": "Whole-node memory PSI from node_exporter. some = any task stalled on memory; full = all non-idle tasks stalled (strong node-wide OOM / thrash signal).",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 44
-      },
-      "id": 1042,
+      "description": "Whole-node memory PSI from node_exporter. some = any task stalled on memory; full = all non-idle tasks stalled (strong node-wide OOM / thrash signal).",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": [
           {
@@ -1050,6 +1279,13 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 61
+      },
+      "id": 1042,
       "options": {
         "legend": {
           "calcs": [
@@ -1084,33 +1320,26 @@
           "legendFormat": "{{node}} full",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Node Memory pressure — waiting (some) & stalled (full)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Node IO pressure \u2014 waiting (some) & stalled (full)",
-      "description": "Whole-node IO PSI from node_exporter. some = any task stalled on IO; full = all non-idle tasks stalled. Sustained full IO pressure indicates the node's disk/EBS is the bottleneck.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 44
-      },
-      "id": 1043,
+      "description": "Whole-node IO PSI from node_exporter. some = any task stalled on IO; full = all non-idle tasks stalled. Sustained full IO pressure indicates the node's disk/EBS is the bottleneck.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": [
           {
@@ -1133,6 +1362,13 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 61
+      },
+      "id": 1043,
       "options": {
         "legend": {
           "calcs": [
@@ -1167,322 +1403,315 @@
           "legendFormat": "{{node}} full",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Node IO pressure — waiting (some) & stalled (full)",
+      "type": "timeseries"
     },
     {
-      "id": 905,
-      "type": "row",
-      "title": "Process Memory (process-exporter)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 69
       },
-      "panels": []
+      "id": 905,
+      "panels": [],
+      "title": "Process Memory (process-exporter)",
+      "type": "row"
     },
     {
-      "title": "Process RSS (Resident Memory)",
-      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "bytes"
+        }
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 53
+        "y": 70
       },
       "id": 1012,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"})",
+          "legendFormat": "{{groupname}}"
+        }
+      ],
+      "title": "Process RSS (Resident Memory)",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 15,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
         }
       },
-      "targets": [
-        {
-          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"})",
-          "legendFormat": "{{groupname}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "Process Virtual Memory",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 53
+        "y": 70
       },
       "id": 1013,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"virtual\"})",
+          "legendFormat": "{{groupname}}"
+        }
+      ],
+      "title": "Process Virtual Memory",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 15,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
         }
       },
-      "targets": [
-        {
-          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"virtual\"})",
-          "legendFormat": "{{groupname}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "Process Swap Usage",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 78
       },
       "id": 1014,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"swapped\"})",
+          "legendFormat": "{{groupname}}"
+        }
+      ],
+      "title": "Process Swap Usage",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "Bps"
         }
       },
-      "targets": [
-        {
-          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"swapped\"})",
-          "legendFormat": "{{groupname}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "RSS Growth Rate (per hour)",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 78
       },
       "id": 1015,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (deriv(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"}[1h]))",
+          "legendFormat": "{{groupname}}"
+        }
+      ],
+      "title": "RSS Growth Rate (per hour)",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps",
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "short"
         }
       },
-      "targets": [
-        {
-          "expr": "sum by (groupname) (deriv(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"}[1h]))",
-          "legendFormat": "{{groupname}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "Open File Descriptors",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 86
       },
       "id": 1016,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_open_filedesc{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"})",
+          "legendFormat": "{{groupname}}"
+        }
+      ],
+      "title": "Open File Descriptors",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "short"
         }
       },
-      "targets": [
-        {
-          "expr": "sum by (groupname) (namedprocess_namegroup_open_filedesc{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"})",
-          "legendFormat": "{{groupname}}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "Thread Count",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 86
       },
       "id": 1017,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
       },
       "targets": [
         {
-          "expr": "sum by (groupname) (namedprocess_namegroup_num_threads{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"})",
-          "legendFormat": "{{groupname}}",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_num_threads{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"})",
+          "legendFormat": "{{groupname}}"
         }
       ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
+      "title": "Thread Count",
+      "type": "timeseries"
     },
     {
-      "title": "Cgroup memory.current vs Process RSS (per group)",
-      "description": "Whole-cgroup memory (memory.current, solid) vs the sum of matched process RSS (dashed). The gap is page cache / kernel memory / unmatched procs in the cgroup. cgroup >= process-sum is expected.",
-      "type": "timeseries",
-      "id": 1018,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 77
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "description": "Whole-cgroup memory (memory.current, solid) vs the sum of matched process RSS (dashed). The gap is page cache / kernel memory / unmatched procs in the cgroup. cgroup >= process-sum is expected.",
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
             "lineWidth": 2,
             "showPoints": "never",
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": [
           {
@@ -1505,6 +1734,13 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 94
+      },
+      "id": 1018,
       "options": {
         "legend": {
           "calcs": [
@@ -1522,48 +1758,41 @@
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
           "expr": "avg by (groupname) (namedprocess_namegroup_cgroup_memory_current_bytes{node=~\"$node\", groupname=~\"$group\"})",
           "legendFormat": "{{groupname}} cgroup",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
+          "refId": "A"
         },
         {
-          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"})",
-          "legendFormat": "{{groupname}} RSS",
-          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"resident\"})",
+          "legendFormat": "{{groupname}} RSS",
+          "refId": "B"
         }
-      ]
+      ],
+      "title": "Cgroup memory.current vs Process RSS (per group)",
+      "type": "timeseries"
     },
     {
-      "id": 1019,
-      "type": "timeseries",
-      "title": "Cgroup Swap vs Process Swap (per group)",
-      "description": "Whole-cgroup swap (memory.swap.current, solid) vs summed per-process swap (memory_bytes{memtype=swapped}, dashed). Like the RSS overlay: cgroup counts the whole cgroup once; process-sum is matched PIDs only.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 77
-      },
+      "description": "Whole-cgroup swap (memory.swap.current, solid) vs summed per-process swap (memory_bytes{memtype=swapped}, dashed). Like the RSS overlay: cgroup counts the whole cgroup once; process-sum is matched PIDs only.",
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": [
           {
@@ -1575,72 +1804,71 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "fill": "dash",
                   "dash": [
                     10,
                     10
-                  ]
+                  ],
+                  "fill": "dash"
                 }
               }
             ]
           }
         ]
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg by (groupname) (namedprocess_namegroup_cgroup_memory_swap_current_bytes{node=~\"$node\", groupname=~\"$group\"})",
-          "legendFormat": "{{groupname}} cgroup swap",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "refId": "B",
-          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"swapped\"})",
-          "legendFormat": "{{groupname}} process swap",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 94
+      },
+      "id": 1019,
       "options": {
         "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
           "calcs": [
             "mean",
             "max"
-          ]
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
-      }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg by (groupname) (namedprocess_namegroup_cgroup_memory_swap_current_bytes{node=~\"$node\", groupname=~\"$group\"})",
+          "legendFormat": "{{groupname}} cgroup swap",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\", memtype=\"swapped\"})",
+          "legendFormat": "{{groupname}} process swap",
+          "refId": "B"
+        }
+      ],
+      "title": "Cgroup Swap vs Process Swap (per group)",
+      "type": "timeseries"
     },
     {
-      "title": "Process Restarts",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 85
-      },
-      "id": 1020,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
+            "drawStyle": "points",
             "fillOpacity": 0,
             "lineWidth": 2,
-            "spanNulls": true,
-            "drawStyle": "points",
-            "pointSize": 10
+            "pointSize": 10,
+            "spanNulls": true
           },
           "thresholds": {
             "steps": [
@@ -1653,58 +1881,66 @@
                 "value": 1
               }
             ]
-          }
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 102
+      },
+      "id": 1020,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
       },
       "targets": [
         {
-          "expr": "changes(namedprocess_namegroup_oldest_start_time_seconds{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"}[5m])",
-          "legendFormat": "{{groupname}}",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "changes(namedprocess_namegroup_oldest_start_time_seconds{job=\"kubernetes-service-endpoints\", node=~\"$node\", groupname=~\"$group\"}[5m])",
+          "legendFormat": "{{groupname}}"
         }
       ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
+      "title": "Process Restarts",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "memory.stat fields by group",
-      "description": "Selected memory.stat fields (anon/file/slab/sock per the config allowlist).",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 93
-      },
-      "id": 1021,
+      "description": "Selected memory.stat fields (anon/file/slab/sock per the config allowlist).",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
           "unit": "bytes"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 110
+      },
+      "id": 1021,
       "options": {
         "legend": {
           "calcs": [
@@ -1730,49 +1966,49 @@
           "legendFormat": "{{groupname}} / {{field}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "memory.stat fields by group",
+      "type": "timeseries"
     },
     {
-      "type": "row",
-      "id": 908,
-      "title": "Block IO (io.stat)",
       "collapsed": false,
       "gridPos": {
-        "x": 0,
-        "y": 102,
+        "h": 1,
         "w": 24,
-        "h": 1
+        "x": 0,
+        "y": 119
       },
-      "panels": []
+      "id": 908,
+      "panels": [],
+      "title": "Block IO (io.stat)",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "id": 1044,
-      "title": "IO operations rate (io.stat rios/wios) by group & device",
-      "description": "Per-cgroup IOPS: rate of io_ops_total split by iomode. device is MAJ:MIN, resolved to the kernel disk name via node_disk_info (e.g. nvme0n1 = root EBS). This is the per-cgroup analog of EBS VolumeReadOps/VolumeWriteOps.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 103,
-        "w": 12,
-        "h": 9
-      },
+      "description": "Per-cgroup IOPS: rate of io_ops_total split by iomode. device is MAJ:MIN, resolved to the kernel disk name via node_disk_info (e.g. nvme0n1 = root EBS). This is the per-cgroup analog of EBS VolumeReadOps/VolumeWriteOps.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "iops",
-          "decimals": 1
+          "decimals": 1,
+          "unit": "iops"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 120
+      },
+      "id": 1044,
       "options": {
         "legend": {
           "calcs": [
@@ -1795,39 +2031,39 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "label_replace(label_replace(sum by (node, groupname, device, iomode) (rate(namedprocess_namegroup_cgroup_io_ops_total{node=~\"$node\", groupname=~\"$group\", iomode=~\"read|write\"}[5m])), \"major\", \"$1\", \"device\", \"([0-9]+):([0-9]+)\"), \"minor\", \"$2\", \"device\", \"([0-9]+):([0-9]+)\")\n* on (node, major, minor) group_left(diskname)\nlabel_replace(node_disk_info{node=~\"$node\"}, \"diskname\", \"$1\", \"device\", \"(.*)\")",
-          "legendFormat": "{{groupname}} \u00b7 {{diskname}} ({{device}}) {{iomode}}",
+          "legendFormat": "{{groupname}} · {{diskname}} ({{device}}) {{iomode}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "IO operations rate (io.stat rios/wios) by group & device",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "id": 1045,
-      "title": "IO throughput rate (io.stat rbytes/wbytes) by group & device",
-      "description": "Per-cgroup disk throughput: rate of io_bytes_total split by iomode. device MAJ:MIN resolved to kernel disk name via node_disk_info. Analog of EBS VolumeReadBytes/VolumeWriteBytes.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "x": 12,
-        "y": 103,
-        "w": 12,
-        "h": 9
-      },
+      "description": "Per-cgroup disk throughput: rate of io_bytes_total split by iomode. device MAJ:MIN resolved to kernel disk name via node_disk_info. Analog of EBS VolumeReadBytes/VolumeWriteBytes.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "Bps",
-          "decimals": 0
+          "decimals": 0,
+          "unit": "Bps"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 120
+      },
+      "id": 1045,
       "options": {
         "legend": {
           "calcs": [
@@ -1850,52 +2086,52 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "label_replace(label_replace(sum by (node, groupname, device, iomode) (rate(namedprocess_namegroup_cgroup_io_bytes_total{node=~\"$node\", groupname=~\"$group\", iomode=~\"read|write\"}[5m])), \"major\", \"$1\", \"device\", \"([0-9]+):([0-9]+)\"), \"minor\", \"$2\", \"device\", \"([0-9]+):([0-9]+)\")\n* on (node, major, minor) group_left(diskname)\nlabel_replace(node_disk_info{node=~\"$node\"}, \"diskname\", \"$1\", \"device\", \"(.*)\")",
-          "legendFormat": "{{groupname}} \u00b7 {{diskname}} ({{device}}) {{iomode}}",
+          "legendFormat": "{{groupname}} · {{diskname}} ({{device}}) {{iomode}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "IO throughput rate (io.stat rbytes/wbytes) by group & device",
+      "type": "timeseries"
     },
     {
-      "type": "row",
-      "id": 909,
-      "title": "PID / thread exhaustion",
       "collapsed": false,
       "gridPos": {
-        "x": 0,
-        "y": 112,
+        "h": 1,
         "w": 24,
-        "h": 1
+        "x": 0,
+        "y": 129
       },
-      "panels": []
+      "id": 909,
+      "panels": [],
+      "title": "PID / thread exhaustion",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "id": 1046,
-      "title": "PID/thread exhaustion events (pids.events max)",
-      "description": "rate of fork/clone rejections caused by hitting pids.max. Non-zero = the cgroup ran out of its task (process+thread) allotment \u2014 the NMA SIGABRT signature.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 113,
-        "w": 8,
-        "h": 8
-      },
+      "description": "rate of fork/clone rejections caused by hitting pids.max. Non-zero = the cgroup ran out of its task (process+thread) allotment — the NMA SIGABRT signature.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 130
+      },
+      "id": 1046,
       "options": {
         "legend": {
           "calcs": [
@@ -1921,36 +2157,36 @@
           "legendFormat": "{{groupname}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "PID/thread exhaustion events (pids.events max)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "id": 1047,
-      "title": "Task saturation \u2014 current & peak vs limit (pids.current/peak \u00f7 pids.max)",
-      "description": "How close each cgroup is to its pids.max task limit. peak/max surviving near 1.0 after an incident is the fingerprint of a limit-hit crash.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "x": 8,
-        "y": 113,
-        "w": 8,
-        "h": 8
-      },
+      "description": "How close each cgroup is to its pids.max task limit. peak/max surviving near 1.0 after an incident is the fingerprint of a limit-hit crash.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "decimals": 0
+          "decimals": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 130
+      },
+      "id": 1047,
       "options": {
         "legend": {
           "calcs": [
@@ -1985,36 +2221,36 @@
           "legendFormat": "{{groupname}} peak",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Task saturation — current & peak vs limit (pids.current/peak ÷ pids.max)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "id": 1048,
-      "title": "Tasks: current / peak / limit (pids.current/peak/max)",
-      "description": "Absolute task counts and the limit per cgroup. peak is the high-water mark and survives after current recedes.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "x": 16,
-        "y": 113,
-        "w": 8,
-        "h": 8
-      },
+      "description": "Absolute task counts and the limit per cgroup. peak is the high-water mark and survives after current recedes.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 130
+      },
+      "id": 1048,
       "options": {
         "legend": {
           "calcs": [
@@ -2058,49 +2294,49 @@
           "legendFormat": "{{groupname}} max",
           "refId": "C"
         }
-      ]
+      ],
+      "title": "Tasks: current / peak / limit (pids.current/peak/max)",
+      "type": "timeseries"
     },
     {
-      "id": 906,
-      "type": "row",
-      "title": "Pressure Stall (PSI)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 121
+        "y": 138
       },
-      "panels": []
+      "id": 906,
+      "panels": [],
+      "title": "Pressure Stall (PSI)",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "CPU pressure \u2014 waiting (some)",
-      "description": "Fraction of wall time procs in the cgroup were stalled waiting on CPU. rate() of the seconds counter \u2248 stalled-seconds per second.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 122
-      },
-      "id": 1022,
+      "description": "Fraction of wall time procs in the cgroup were stalled waiting on CPU. rate() of the seconds counter ≈ stalled-seconds per second.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 139
+      },
+      "id": 1022,
       "options": {
         "legend": {
           "calcs": [
@@ -2126,33 +2362,26 @@
           "legendFormat": "{{groupname}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "CPU pressure — waiting (some)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Memory pressure \u2014 waiting (some) & stalled (full)",
-      "description": "waiting = PSI some (any proc stalled); stalled = PSI full (all procs stalled). Full memory pressure is a strong OOM / thrash signal.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 122
-      },
-      "id": 1023,
+      "description": "waiting = PSI some (any proc stalled); stalled = PSI full (all procs stalled). Full memory pressure is a strong OOM / thrash signal.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": [
           {
@@ -2175,6 +2404,13 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 139
+      },
+      "id": 1023,
       "options": {
         "legend": {
           "calcs": [
@@ -2209,32 +2445,25 @@
           "legendFormat": "{{groupname}} full",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Memory pressure — waiting (some) & stalled (full)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "IO pressure \u2014 waiting (some) & stalled (full)",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 122
-      },
-      "id": 1024,
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percentunit",
-          "min": 0
+          "min": 0,
+          "unit": "percentunit"
         },
         "overrides": [
           {
@@ -2257,6 +2486,13 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 139
+      },
+      "id": 1024,
       "options": {
         "legend": {
           "calcs": [
@@ -2291,36 +2527,36 @@
           "legendFormat": "{{groupname}} full",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "IO pressure — waiting (some) & stalled (full)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Kernel PSI avg10 \u2014 waiting (some) & stalled (full), all resources (percent, 10s window)",
-      "description": "namedprocess_namegroup_cgroup_pressure_percent, window=avg10. Kernel-computed averages \u2014 no rate() needed.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 130
-      },
-      "id": 1025,
+      "description": "namedprocess_namegroup_cgroup_pressure_percent, window=avg10. Kernel-computed averages — no rate() needed.",
       "fieldConfig": {
         "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "lineWidth": 1,
+            "showPoints": "never"
           },
-          "unit": "percent",
-          "min": 0
+          "min": 0,
+          "unit": "percent"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 147
+      },
+      "id": 1025,
       "options": {
         "legend": {
           "calcs": [
@@ -2346,257 +2582,250 @@
           "legendFormat": "{{groupname}} {{resource}}/{{kind}}",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "Kernel PSI avg10 — waiting (some) & stalled (full), all resources (percent, 10s window)",
+      "type": "timeseries"
     },
     {
-      "id": 907,
-      "type": "row",
-      "title": "NMA Go Runtime (eks-node-monitoring-agent)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 138
+        "y": 155
       },
-      "panels": []
+      "id": 907,
+      "panels": [],
+      "title": "NMA Go Runtime (eks-node-monitoring-agent)",
+      "type": "row"
     },
     {
-      "title": "NMA Heap Memory",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 139
-      },
-      "id": 1026,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
             "fillOpacity": 15,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 156
+      },
+      "id": 1026,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
           "expr": "go_memstats_heap_alloc_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "heap alloc (in use)",
+          "legendFormat": "heap alloc (in use)"
+        },
+        {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
+          },
           "expr": "go_memstats_heap_sys_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "heap sys (from OS)",
+          "legendFormat": "heap sys (from OS)"
+        },
+        {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
+          },
           "expr": "go_memstats_heap_idle_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "heap idle (unused spans)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
+          "legendFormat": "heap idle (unused spans)"
         },
         {
-          "expr": "go_memstats_heap_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "heap inuse (active spans)",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "go_memstats_heap_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "heap inuse (active spans)"
         }
       ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
+      "title": "NMA Heap Memory",
+      "type": "timeseries"
     },
     {
-      "title": "NMA Total Memory (Go runtime)",
-      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "unit": "bytes"
+        }
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 139
+        "y": 156
       },
       "id": 1027,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "go_memstats_sys_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "total sys (all Go memory)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "go_memstats_stack_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "stack inuse"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "go_memstats_mspan_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "mspan inuse"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "go_memstats_mcache_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "mcache inuse"
+        }
+      ],
+      "title": "NMA Total Memory (Go runtime)",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "short"
         }
       },
-      "targets": [
-        {
-          "expr": "go_memstats_sys_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "total sys (all Go memory)",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "go_memstats_stack_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "stack inuse",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "go_memstats_mspan_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "mspan inuse",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
-          "expr": "go_memstats_mcache_inuse_bytes{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "mcache inuse",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ],
-      "options": {
-        "legend": {
-          "showLegend": true,
-          "placement": "right",
-          "displayMode": "table",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "title": "NMA Goroutines",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 147
+        "y": 164
       },
       "id": 1028,
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "go_goroutines{job=\"kubernetes-pods\", node=~\"$node\"}",
+          "legendFormat": "goroutines"
+        }
+      ],
+      "title": "NMA Goroutines",
+      "type": "timeseries"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 2,
             "spanNulls": true
-          }
+          },
+          "unit": "s"
         }
       },
-      "targets": [
-        {
-          "expr": "go_goroutines{job=\"kubernetes-pods\", node=~\"$node\"}",
-          "legendFormat": "goroutines",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
-        }
-      ]
-    },
-    {
-      "title": "NMA GC Pause Duration (quantiles)",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 147
+        "y": 164
       },
       "id": 1029,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "spanNulls": true
-          }
-        }
-      },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
           "expr": "go_gc_duration_seconds{job=\"kubernetes-pods\", node=~\"$node\", quantile=\"0.5\"}",
-          "legendFormat": "p50",
+          "legendFormat": "p50"
+        },
+        {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
-        },
-        {
+          },
           "expr": "go_gc_duration_seconds{job=\"kubernetes-pods\", node=~\"$node\", quantile=\"0.75\"}",
-          "legendFormat": "p75",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
+          "legendFormat": "p75"
         },
         {
-          "expr": "go_gc_duration_seconds{job=\"kubernetes-pods\", node=~\"$node\", quantile=\"1\"}",
-          "legendFormat": "p100 (max)",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "go_gc_duration_seconds{job=\"kubernetes-pods\", node=~\"$node\", quantile=\"1\"}",
+          "legendFormat": "p100 (max)"
         }
-      ]
+      ],
+      "title": "NMA GC Pause Duration (quantiles)",
+      "type": "timeseries"
     },
     {
-      "title": "NMA GC Rate & Heap Alloc Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 147
-      },
-      "id": 1030,
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -2640,24 +2869,122 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 164
+      },
+      "id": 1030,
       "targets": [
         {
-          "expr": "rate(go_memstats_alloc_bytes_total{job=\"kubernetes-pods\", node=~\"$node\"}[5m])",
-          "legendFormat": "alloc rate",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "rate(go_memstats_alloc_bytes_total{job=\"kubernetes-pods\", node=~\"$node\"}[5m])",
+          "legendFormat": "alloc rate"
         },
         {
-          "expr": "rate(go_gc_duration_seconds_count{job=\"kubernetes-pods\", node=~\"$node\"}[5m])",
-          "legendFormat": "GC cycles/s",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
-          }
+          },
+          "expr": "rate(go_gc_duration_seconds_count{job=\"kubernetes-pods\", node=~\"$node\"}[5m])",
+          "legendFormat": "GC cycles/s"
         }
-      ]
+      ],
+      "title": "NMA GC Rate & Heap Alloc Rate",
+      "type": "timeseries"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "process-exporter",
+    "cgroup-v2"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "name": "DS_PROMETHEUS",
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(node_memory_MemTotal_bytes, node)",
+        "includeAll": false,
+        "label": "Node",
+        "multi": false,
+        "name": "node",
+        "query": {
+          "query": "label_values(node_memory_MemTotal_bytes, node)",
+          "refId": "n"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\"}, groupname)",
+        "includeAll": true,
+        "label": "Group",
+        "multi": true,
+        "name": "group",
+        "query": {
+          "query": "label_values(namedprocess_namegroup_memory_bytes{job=\"kubernetes-service-endpoints\"}, groupname)",
+          "refId": "g"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(kube_node_labels{node=~\"$node\"}, label_node_kubernetes_io_instance_type)",
+        "includeAll": false,
+        "label": "Instance Type",
+        "multi": false,
+        "name": "instance_type",
+        "query": {
+          "query": "label_values(kube_node_labels{node=~\"$node\"}, label_node_kubernetes_io_instance_type)",
+          "refId": "it"
+        },
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "",
+  "title": "Node Memory, CPU & Pressure (cgroup v2)",
+  "uid": "node-proc-cgroup",
+  "version": 11
 }
