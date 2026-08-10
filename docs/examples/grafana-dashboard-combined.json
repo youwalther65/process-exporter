@@ -342,6 +342,7 @@
               "mode": "none"
             }
           },
+          "min": 0,
           "unit": "percentunit"
         },
         "overrides": [
@@ -427,7 +428,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "iowait fraction=CPU blocked on I/O (EFS/NFS reads/writes). softirq fraction=soft interrupts (network RX/TX, RPC completion, TLS via efs-proxy). Sustained >0.5 combined = alert threshold. Pair with node_mountstats_* to attribute to a specific EFS filesystem.",
+      "description": "iowait fraction=CPU blocked on I/O (EFS/NFS reads/writes). softirq fraction=soft interrupts (network RX/TX, RPC completion, TLS via efs-proxy). Pair with node_mountstats_* to attribute to a specific EFS filesystem.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -439,6 +440,7 @@
               "mode": "none"
             }
           },
+          "min": 0,
           "unit": "percentunit"
         },
         "overrides": []
@@ -485,7 +487,7 @@
           "refId": "B"
         }
       ],
-      "title": "Node CPU: iowait & softirq fraction (EFS/NFS I/O + network) — alert signal",
+      "title": "Node CPU: iowait & softirq fraction (EFS/NFS I/O + network)",
       "type": "timeseries"
     },
     {
@@ -2960,5 +2962,5 @@
   "timezone": "",
   "title": "Node Memory, CPU & Pressure (cgroup v2)",
   "uid": "node-proc-cgroup",
-  "version": 14
+  "version": 15
 }
