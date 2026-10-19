@@ -3,10 +3,12 @@ Prometheus exporter that mines /proc to report on selected processes.
 
 > **This is a maintained fork of [ncabatoff/process-exporter](https://github.com/ncabatoff/process-exporter).**
 > It tracks upstream and adds **opt-in cgroup v2 metrics** — pressure-stall
-> information (PSI) plus `memory`/`cpu`/`pids` cgroup stats — exported per process
-> group. These are off by default (`-cgroup.*` flags); with no flag the exporter
-> behaves exactly as upstream. See [cgroup v2 Metrics](#cgroup-v2-metrics) below
-> and [`docs/design-cgroupv2.md`](docs/design-cgroupv2.md) for the design.
+> information (PSI) plus `memory`/`cpu`/`pids`/`io` cgroup stats — exported per
+> process group, and per cgroup path for cgroups that hold no grouped process
+> (`kubepods.slice`, pod cgroups). These are off by default (`-cgroup.*` flags);
+> with no flag the exporter behaves exactly as upstream. See
+> [cgroup v2 Metrics](#cgroup-v2-metrics) below and
+> [`docs/design-cgroupv2.md`](docs/design-cgroupv2.md) for the design.
 
 [release]: https://github.com/ncabatoff/process-exporter/releases/latest
 
@@ -433,6 +435,63 @@ cgroups:
     - file
     - slab
 ```
+
+### Cgroup paths, read directly (`cgroups.paths`)
+
+Per-group metrics can only describe a cgroup the exporter has a process group
+for. Some of the cgroups that matter most have no such group: nothing in
+`process_names` matches "every container in this pod", and on Kubernetes the
+interesting slice — `kubepods.slice` and the pod cgroups under it — is created
+and destroyed by the kubelet while the exporter runs.
+
+`cgroups.paths` reads cgroups by path instead, whether or not any grouped
+process lives in them. The same families and the same `memory.stat` allowlist
+apply, under metric names with `namedprocess_cgroup_` in place of
+`namedprocess_namegroup_cgroup_`, and a `cgroup` label holding the path:
+
+```yaml
+cgroups:
+  memory:
+    stat_fields:
+    - file
+    - workingset_refault_file
+    - workingset_refault_anon
+  # How many cgroups one pattern may expand to. Default 200.
+  max_paths: 200
+  paths:
+  # Whole-slice totals.
+  - /kubepods.slice
+  - /runtime.slice
+  - /system.slice
+  # One series per QoS class.
+  - /kubepods.slice/*
+  # One series per pod. Guaranteed pods sit directly under kubepods.slice, so
+  # this also matches the container cgroups of Guaranteed pods.
+  - /kubepods.slice/*/*
+```
+
+```
+namedprocess_cgroup_memory_stat_bytes{cgroup="/kubepods.slice",field="workingset_refault_file"} 1.98e+06
+```
+
+A `*` matches one path segment and never descends on its own, so a pattern reads
+exactly the depth it names. Globs with a prefix work too
+(`/kubepods.slice/kubepods-burstable.slice/*-podaaa.slice`). A segment with no
+wildcard is taken literally and costs no directory listing.
+
+Patterns are expanded on every scrape, so a pod cgroup created since the last
+scrape appears without a restart, and one that has gone away stops being read.
+
+**`max_paths` drops, it does not truncate.** Pod cgroups have no natural
+ceiling, so a pattern matching more than `max_paths` contributes no series at
+all, logs a line, and increments
+`namedprocess_scrape_cgroup_pattern_dropped`. A truncated expansion would
+quietly leave cgroups out of any `sum()` over the `cgroup` label, which is worse
+than an obvious gap — so alert on that counter. It also covers a pattern that
+could not be expanded for any other reason.
+
+The root cgroup is refused, as it is for process groups: its numbers are
+machine-wide and belong to no cgroup in particular.
 
 ### Multiple cgroups per group (skip-and-count)
 

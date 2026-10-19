@@ -83,6 +83,27 @@ process_names:
 	c.Assert(err, IsNil)
 	c.Check(cfg.Cgroups.PSIWindows, IsNil)
 	c.Check(cfg.Cgroups.MemoryStatFields, IsNil)
+	c.Check(cfg.Cgroups.Paths, IsNil)
+	c.Check(cfg.Cgroups.MaxPaths, Equals, 0)
+}
+
+func (s MySuite) TestConfigCgroupPaths(c *C) {
+	// Paths are read independently of process_names, so a pattern may name a
+	// cgroup that holds no process the exporter groups.
+	yml := `
+process_names:
+  - comm:
+    - nma
+cgroups:
+  max_paths: 64
+  paths:
+  - /kubepods.slice
+  - /kubepods.slice/*/*
+`
+	cfg, err := GetConfig(yml, false)
+	c.Assert(err, IsNil)
+	c.Check(cfg.Cgroups.Paths, DeepEquals, []string{"/kubepods.slice", "/kubepods.slice/*/*"})
+	c.Check(cfg.Cgroups.MaxPaths, Equals, 64)
 }
 
 func (s MySuite) TestConfigTemplates(c *C) {

@@ -188,6 +188,17 @@ type CgroupConfig struct {
 	// MemoryStatFields lists which memory.stat fields to emit. Empty means the
 	// collector's curated default subset (never all fields).
 	MemoryStatFields []string
+	// Paths lists cgroup paths to read directly, independent of which processes
+	// the exporter groups. A segment may be a wildcard, so "/kubepods.slice/*/*"
+	// covers every pod cgroup. These are emitted as namedprocess_cgroup_* with a
+	// "cgroup" label; the per-group metrics are unaffected. Empty means no
+	// path-based collection.
+	Paths []string
+	// MaxPaths bounds how many cgroups one pattern may expand to. A pattern over
+	// that limit is dropped with a log line rather than emitted truncated,
+	// because a partial expansion hides cgroups without saying so. Zero means
+	// the collector's default.
+	MaxPaths int
 }
 
 type Config struct {
@@ -204,8 +215,10 @@ func (c *Config) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 			StatFields []string `yaml:"stat_fields"`
 		}
 		cgroupRules struct {
-			PSI    psiRules    `yaml:"psi"`
-			Memory memoryRules `yaml:"memory"`
+			PSI      psiRules    `yaml:"psi"`
+			Memory   memoryRules `yaml:"memory"`
+			Paths    []string    `yaml:"paths"`
+			MaxPaths int         `yaml:"max_paths"`
 		}
 		root struct {
 			Matchers MatcherRules `yaml:"process_names"`
@@ -225,6 +238,8 @@ func (c *Config) UnmarshalYAML(unmarshal func(v interface{}) error) error {
 	cfg.Cgroups = CgroupConfig{
 		PSIWindows:       r.Cgroups.PSI.Windows,
 		MemoryStatFields: r.Cgroups.Memory.StatFields,
+		Paths:            r.Cgroups.Paths,
+		MaxPaths:         r.Cgroups.MaxPaths,
 	}
 	*c = *cfg
 	return nil
