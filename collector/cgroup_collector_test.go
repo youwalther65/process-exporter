@@ -26,6 +26,7 @@ func (t *testCgroupCollector) Collect(ch chan<- prometheus.Metric) {
 	for gname, g := range t.groups {
 		t.cc.collectGroup(ch, gname, g)
 	}
+	t.cc.collectPaths(ch)
 	t.cc.collectSummary(ch)
 }
 

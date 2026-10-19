@@ -380,6 +380,10 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(scrapePartialErrorsDesc,
 		prometheus.CounterValue, float64(p.scrapePartialErrors))
 	if p.cgroup != nil {
+		// Path-based collection runs here rather than in the per-group loop
+		// because it is not driven by process groups at all: the configured
+		// cgroups are read whether or not any grouped process lives in them.
+		p.cgroup.collectPaths(ch)
 		p.cgroup.collectSummary(ch)
 	}
 }

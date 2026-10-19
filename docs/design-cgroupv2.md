@@ -45,6 +45,9 @@ cache, kernel memory, and unmatched/child procs charged to the cgroup.)
                     (collector/cgroup_collector.go collectGroup)
                                         │
                     cgroup.Reader (os.Root on /sys/fs/cgroup) ─► PSI / memory / cpu / pids
+                                        ▲
+   config cgroups.paths ──(cgroup.ExpandPattern)──► matching cgroup paths
+                          (collector collectPaths)
 ```
 
 - **Path resolution** (`proc/read.go`): the unified v2 path is the `0::/path`
@@ -56,8 +59,32 @@ cache, kernel memory, and unmatched/child procs charged to the cgroup.)
 - **Collection** (`collector/cgroup_collector.go`): serialized through the
   existing single scrape goroutine (`scrapeChan`), so collector state is not
   accessed concurrently.
+- **Path targets** (`cgroup/reader.go` `ExpandPattern`, collector
+  `collectPaths`): the second entry point, which does not involve `/proc` or
+  process grouping at all. Configured patterns are expanded against cgroupfs on
+  every scrape and read through the same `Reader`.
 
 ## Design decisions worth noting
+
+- **Path targets are a separate metric family, not a relabelling of the group
+  one.** `namedprocess_cgroup_*{cgroup="..."}` carries a different name from
+  `namedprocess_namegroup_cgroup_*{groupname="..."}` so the two can describe the
+  same cgroup in one scrape without colliding, and so a query cannot mix "what
+  containerd's processes use" with "what the containerd cgroup holds". The emit
+  code is shared through `descSet`, which differs only in metric name, label
+  name and help wording — never in label arity.
+- **A wildcard matches one segment and never descends.** A pattern reads the
+  depth it names. Unbounded recursion would make the series count depend on the
+  shape of the tree rather than on the config.
+- **Over `max_paths` the pattern is dropped, not truncated.** Pod cgroups have
+  no natural ceiling, so a cap is needed; but emitting a prefix of the matches
+  would leave cgroups out of a `sum()` over the `cgroup` label with nothing to
+  show it. Dropping whole, logging, and incrementing
+  `namedprocess_scrape_cgroup_pattern_dropped` makes the gap visible.
+- **Expansion runs every scrape.** Pod cgroups appear and disappear while the
+  exporter runs, so a cached expansion would miss new pods and keep reading dead
+  ones. A parent that vanishes mid-expansion drops out quietly, because that is
+  normal on a node with churning pods, rather than failing the pattern.
 
 - **`cpu_stalled` emitted only on Linux >= 5.13.** `cpu.pressure` gained a `full`
   line in 5.13. The collector now carries a `cpu_stalled` descriptor; on older

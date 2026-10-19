@@ -1,9 +1,13 @@
 package cgroup
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -101,4 +105,112 @@ func (r *Reader) ReadIOStat(cgroupPath string) (map[string]map[string]uint64, er
 		return nil, err
 	}
 	return ParseIOStat(content)
+}
+
+// ErrTooManyMatches is returned by ExpandPattern when a pattern matches more
+// cgroups than the caller allowed. The caller is expected to drop the pattern
+// rather than emit the truncated set, because a partial expansion silently
+// hides cgroups from the metrics.
+var ErrTooManyMatches = errors.New("cgroup pattern matched more paths than the limit")
+
+// childDirs lists the immediate child cgroups of cgroupPath. Only directories
+// are returned, because in cgroupv2 a child cgroup is a directory and every
+// other entry is an interface file.
+func (r *Reader) childDirs(cgroupPath string) ([]string, error) {
+	rel := strings.Trim(cgroupPath, "/")
+	if rel == "" {
+		rel = "."
+	}
+	f, err := r.root.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	entries, err := f.ReadDir(-1)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// ExpandPattern turns a cgroup path pattern into the concrete cgroup paths it
+// matches, as absolute paths under the root ("/kubepods.slice/...").
+//
+// A segment containing a wildcard is matched against the child cgroups present
+// at that level using path.Match, so "*" matches one level and never descends
+// on its own. A segment with no wildcard is taken literally and is not listed,
+// which keeps the common case of a fixed path at one syscall. Results are
+// sorted, and each one is confirmed to be a directory, so a pattern that
+// matches nothing returns an empty slice rather than paths that do not exist.
+//
+// max bounds the expansion at every level: a pattern that would exceed it
+// returns ErrTooManyMatches with no paths. Per-pod cgroup names are unbounded
+// in number, so this is the guard that keeps a NodeClass with many small pods
+// from turning one pattern into thousands of series. max <= 0 means no limit.
+func (r *Reader) ExpandPattern(pattern string, max int) ([]string, error) {
+	segments := make([]string, 0, 8)
+	for _, s := range strings.Split(pattern, "/") {
+		if s != "" {
+			segments = append(segments, s)
+		}
+	}
+	// The root cgroup holds machine-wide totals that belong to no group, and
+	// the group-labelled collector already refuses it. Refuse it here too so
+	// the two paths agree.
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("pattern %q resolves to the root cgroup", pattern)
+	}
+
+	paths := []string{""}
+	for _, seg := range segments {
+		if !strings.ContainsAny(seg, "*?[") {
+			for i := range paths {
+				paths[i] += "/" + seg
+			}
+			continue
+		}
+		next := make([]string, 0, len(paths))
+		for _, p := range paths {
+			children, err := r.childDirs(p)
+			if err != nil {
+				// A parent that has gone away mid-scrape is normal on a node
+				// with churning pods, so it drops out instead of failing the
+				// whole pattern.
+				continue
+			}
+			for _, child := range children {
+				ok, err := path.Match(seg, child)
+				if err != nil {
+					return nil, fmt.Errorf("pattern %q: %w", pattern, err)
+				}
+				if ok {
+					next = append(next, p+"/"+child)
+				}
+			}
+		}
+		if max > 0 && len(next) > max {
+			return nil, fmt.Errorf("%w: %q matched %d at segment %q, limit %d",
+				ErrTooManyMatches, pattern, len(next), seg, max)
+		}
+		paths = next
+	}
+
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		fi, err := r.root.Stat(strings.TrimPrefix(p, "/"))
+		if err != nil || !fi.IsDir() {
+			continue
+		}
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out, nil
 }
