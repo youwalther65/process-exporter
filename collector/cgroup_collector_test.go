@@ -223,6 +223,7 @@ func writeStatFixture(t *testing.T, cgroupPath string) string {
 		"pids.max":            "4096\n",
 		"pids.peak":           "512\n",
 		"pids.events":         "max 7\n",
+		"memory.events":       "low 0\nhigh 3\nmax 11\noom 2\noom_kill 5\noom_group_kill 0\n",
 		// One device with the full modern field set (incl. discard).
 		"io.stat": "259:0 rbytes=1048576 wbytes=2097152 rios=100 wios=200 dbytes=4096 dios=3\n",
 	}
@@ -384,6 +385,35 @@ func TestCgroupCollectorIOAbsent(t *testing.T) {
 	}
 	if n := testutil.CollectAndCount(tc, "namedprocess_namegroup_cgroup_io_ops_total"); n != 0 {
 		t.Errorf("expected no io ops series when io.stat absent, got %d", n)
+	}
+}
+
+// TestCgroupCollectorMemoryEvents verifies that every memory.events key is
+// emitted as a counter, so an OOM kill can be attributed to the unit's cgroup.
+func TestCgroupCollectorMemoryEvents(t *testing.T) {
+	const path = "/runtime.slice/nma.service"
+	root := writeStatFixture(t, path)
+
+	cc, err := newCgroupCollector(CgroupCollectorOption{CgroupFSPath: root, Memory: true})
+	if err != nil {
+		t.Fatalf("newCgroupCollector: %v", err)
+	}
+	tc := &testCgroupCollector{cc: cc, groups: proc.GroupByName{"nma": proc.Group{CgroupV2Path: path}}}
+
+	const want = `
+# HELP namedprocess_namegroup_cgroup_memory_events_total Memory event counters for this group's cgroup (memory.events), by event: low, high, max, oom, oom_kill, oom_group_kill.
+# TYPE namedprocess_namegroup_cgroup_memory_events_total counter
+namedprocess_namegroup_cgroup_memory_events_total{event="high",groupname="nma"} 3
+namedprocess_namegroup_cgroup_memory_events_total{event="low",groupname="nma"} 0
+namedprocess_namegroup_cgroup_memory_events_total{event="max",groupname="nma"} 11
+namedprocess_namegroup_cgroup_memory_events_total{event="oom",groupname="nma"} 2
+namedprocess_namegroup_cgroup_memory_events_total{event="oom_group_kill",groupname="nma"} 0
+namedprocess_namegroup_cgroup_memory_events_total{event="oom_kill",groupname="nma"} 5
+`
+	if err := testutil.CollectAndCompare(tc, strings.NewReader(want),
+		"namedprocess_namegroup_cgroup_memory_events_total",
+	); err != nil {
+		t.Error(err)
 	}
 }
 

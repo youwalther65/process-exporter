@@ -543,6 +543,14 @@ rate(namedprocess_namegroup_cgroup_pressure_memory_stalled_seconds_total{groupna
   accounting is disabled (the file is absent).
 - `namedprocess_namegroup_cgroup_memory_stat_bytes` gauge — selected
   `memory.stat` fields, with the field name in the `field` label.
+- `namedprocess_namegroup_cgroup_memory_events_total` counter — every key of
+  `memory.events`, with the key in the `event` label: `low`, `high`, `max`,
+  `oom`, `oom_kill` and, from Linux 5.13, `oom_group_kill`. `oom_kill` counts
+  the processes the OOM killer killed in the cgroup and its descendants, so
+  `increase(...{event="oom_kill"}[5m])` attributes kills to a systemd unit or a
+  pod. The counters are hierarchical unless the cgroup2 mount carries
+  `memory_localevents`. The same metric is emitted as
+  `namedprocess_cgroup_memory_events_total` for cgroups read by path.
 
 ### cpu metrics (`-cgroup.cpu`)
 

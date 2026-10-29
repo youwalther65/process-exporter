@@ -64,6 +64,7 @@ type descSet struct {
 	memoryCurrent     *prometheus.Desc
 	memorySwapCurrent *prometheus.Desc
 	memoryStat        *prometheus.Desc
+	memoryEvents      *prometheus.Desc
 
 	cpu *prometheus.Desc
 
@@ -144,6 +145,17 @@ func newDescSet(prefix, label, subject string) *descSet {
 			prefix+"_memory_stat_bytes",
 			"Selected memory.stat fields for "+subject+".",
 			withExtra(label, "field"), nil),
+
+		// memory.events counters, one series per key the kernel reports: low,
+		// high, max, oom, oom_kill and (Linux >= 5.13) oom_group_kill. oom_kill
+		// is the number of processes the OOM killer killed in this cgroup or its
+		// descendants, which is what attributes a kill to a systemd unit or a pod
+		// after the fact. memory.events is hierarchical unless the cgroup2 mount
+		// carries memory_localevents.
+		memoryEvents: prometheus.NewDesc(
+			prefix+"_memory_events_total",
+			"Memory event counters for "+subject+" (memory.events), by event: low, high, max, oom, oom_kill, oom_group_kill.",
+			withExtra(label, "event"), nil),
 
 		cpu: prometheus.NewDesc(
 			prefix+"_cpu_seconds_total",
@@ -323,6 +335,7 @@ func (c *cgroupCollector) describe(ch chan<- *prometheus.Desc) {
 		ch <- d.memoryCurrent
 		ch <- d.memorySwapCurrent
 		ch <- d.memoryStat
+		ch <- d.memoryEvents
 		ch <- d.cpu
 		ch <- d.pidsCurrent
 		ch <- d.pidsMax
@@ -408,8 +421,8 @@ func (c *cgroupCollector) collectOne(ch chan<- prometheus.Metric, d *descSet, id
 	}
 }
 
-// collectMemory emits memory.current, memory.swap.current and the allowlisted
-// memory.stat fields.
+// collectMemory emits memory.current, memory.swap.current, the allowlisted
+// memory.stat fields and the memory.events counters.
 func (c *cgroupCollector) collectMemory(ch chan<- prometheus.Metric, d *descSet, id, cgroupPath string) {
 	if cur, err := c.reader.ReadUint64(cgroupPath, "memory.current"); err != nil {
 		c.debugf("cgroup %q: reading memory.current: %v", id, err)
@@ -423,6 +436,18 @@ func (c *cgroupCollector) collectMemory(ch chan<- prometheus.Metric, d *descSet,
 		c.debugf("cgroup %q: reading memory.swap.current: %v", id, err)
 	} else {
 		ch <- prometheus.MustNewConstMetric(d.memorySwapCurrent, prometheus.GaugeValue, float64(sw), id)
+	}
+
+	// memory.events is read before memory.stat so that a missing memory.stat
+	// cannot suppress the OOM counters. Every key present is emitted; the
+	// kernel adds keys over time (oom_group_kill arrived in 5.13), and a
+	// counter that exists should not be dropped by an allowlist here.
+	if ev, err := c.reader.ReadKeyed(cgroupPath, "memory.events"); err != nil {
+		c.debugf("cgroup %q: reading memory.events: %v", id, err)
+	} else {
+		for event, v := range ev {
+			ch <- prometheus.MustNewConstMetric(d.memoryEvents, prometheus.CounterValue, float64(v), id, event)
+		}
 	}
 
 	stat, err := c.reader.ReadKeyed(cgroupPath, "memory.stat")
